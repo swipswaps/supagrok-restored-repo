@@ -11,7 +11,7 @@ TARGET_REPO="$1"
 # --- Configuration ---
 # Set desired visibility for new repositories ('public', 'private', 'internal')
 NEW_REPO_VISIBILITY="public"
-# Construct the expected HTTPS URL (adjust if using SSH)
+# Construct the expected HTTPS URL
 REPO_URL="https://github.com/${TARGET_REPO}.git"
 
 # Exit on error, undefined variable, or pipe failure
@@ -79,7 +79,6 @@ if ! git diff --staged --quiet; then
     else
         echo "⚠️ git commit command failed unexpectedly." >&2
         # Optionally exit here depending on desired strictness
-        exit 1 # Exit if commit fails for safety
     fi
 else
     echo "ℹ️ No changes staged to commit."
@@ -99,30 +98,6 @@ echo "ℹ️ Checking if remote repository '${TARGET_REPO}' exists..."
 if gh repo view "${TARGET_REPO}" &> /dev/null; then
     # --- Repository Exists - Perform Sync ---
     echo "✅ Remote repository found. Attempting to sync..."
-    # Ensure origin URL is correct before syncing, in case it was changed manually
-    echo "ℹ️ Verifying 'origin' remote URL points to ${REPO_URL}..."
-    if git remote | grep -q '^origin$'; then
-        CURRENT_ORIGIN_URL=$(git remote get-url origin)
-        if [[ "${CURRENT_ORIGIN_URL}" != "${REPO_URL}" ]]; then
-            echo "⚠️ 'origin' remote URL is incorrect (${CURRENT_ORIGIN_URL}). Updating to ${REPO_URL}..."
-            if ! git remote set-url origin "${REPO_URL}"; then
-                 echo "❌ Failed to update 'origin' remote URL before sync." >&2
-                 exit 1
-            fi
-            echo "✅ Updated 'origin' remote URL."
-        else
-            echo "✅ 'origin' remote URL is correct."
-        fi
-    else
-        echo "⚠️ 'origin' remote not found. Adding it before sync..."
-         if ! git remote add origin "${REPO_URL}"; then
-            echo "❌ Failed to add 'origin' remote before sync." >&2
-            exit 1
-        fi
-        echo "✅ Added 'origin' remote."
-    fi
-
-    # Now perform the sync
     if gh repo sync "${TARGET_REPO}" --source "${CURRENT_BRANCH}" --branch "${CURRENT_BRANCH}"; then
         echo "✅ Repository synced successfully to branch '${CURRENT_BRANCH}' on remote '${TARGET_REPO}'."
     else
@@ -130,17 +105,16 @@ if gh repo view "${TARGET_REPO}" &> /dev/null; then
         echo "❌ Failed to sync existing repository '${TARGET_REPO}' with GitHub using 'gh repo sync'. Exit code: ${GH_EXIT_CODE}" >&2
         if [[ ${GH_EXIT_CODE} -eq 1 ]]; then
             echo "ℹ️ Common causes for sync failure include:" >&2
-            echo "   - Local branch '${CURRENT_BRANCH}' has diverged significantly from the remote (fetch/merge needed?)." >&2
+            echo "   - Local branch '${CURRENT_BRANCH}' has diverged significantly from the remote." >&2
             echo "   - Network issues connecting to GitHub." >&2
         fi
         exit ${GH_EXIT_CODE}
     fi
 else
     # --- Repository Does Not Exist - Create, Set Remote, Push Verbose ---
-    echo "ℹ️ Remote repository '${TARGET_REPO}' not found or inaccessible. Attempting to create..."
+    echo "ℹ️ Remote repository not found or inaccessible. Attempting to create..."
 
     # 1. Create the repository structure on GitHub (non-interactively, no push yet)
-    # Use --source . to include local files in the creation context, even though push is separate
     if gh repo create "${TARGET_REPO}" --source . "--${NEW_REPO_VISIBILITY}" < /dev/null; then
         echo "✅ Repository structure '${TARGET_REPO}' created successfully on GitHub."
     else
@@ -148,7 +122,7 @@ else
         echo "❌ Failed to create repository structure '${TARGET_REPO}' with GitHub using 'gh repo create'. Exit code: ${GH_EXIT_CODE}" >&2
          if [[ ${GH_EXIT_CODE} -eq 1 ]]; then
             echo "ℹ️ Common causes for create failure include:" >&2
-            echo "   - Repository name '${TARGET_REPO}' already exists but is inaccessible/private." >&2
+            echo "   - Repository name '${TARGET_REPO}' already exists but is inaccessible." >&2
             echo "   - Insufficient permissions to create repositories." >&2
             echo "   - Network issues." >&2
         fi
