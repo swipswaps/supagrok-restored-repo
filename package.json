@@ -1,0 +1,12 @@
+{
+  "name": "supagrok-script-runner",
+  "version": "1.0.0",
+  "description": "Simple script runner interface",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^29.1.0" 
+  }
+}

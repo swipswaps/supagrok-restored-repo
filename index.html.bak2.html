@@ -1,0 +1,102 @@
+<!-- PRF‑GAZE‑SMOOTH‑BLINK‑LOG‑2025‑05‑01 -->
+<!DOCTYPE html>
+<!-- Directive: PRF‑GAZE‑SMOOTH‑BLINK‑LOG‑2025‑05‑01 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Supagrok Gaze Activation</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%; width: 100%;
+      background: black; color: white; overflow: hidden;
+      font-family: monospace;
+    }
+    canvas#overlay {
+      position: fixed; top: 0; left: 0;
+      pointer-events: none; z-index: 10;
+    }
+    #statusLog {
+      position: fixed; bottom: 0; left: 0; width: 100%;
+      background: black; color: lime;
+      font: 12px monospace; max-height: 25vh;
+      overflow-y: auto; z-index: 1000; padding: 5px;
+      border-top: 1px solid lime;
+    }
+    /* Removed .gaze-button styles */
+  </style>
+</head>
+<body>
+
+<canvas id="overlay" width="1280" height="720"></canvas>
+<!-- Removed gaze-button divs -->
+<div id="statusLog">[👁️ Booting Gaze Tracker...]</div>
+
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script>
+let canvas = document.getElementById("overlay");
+let ctx = canvas.getContext("2d");
+let trail = [];
+let lastBlinkTime = 0;
+let smoothed = { x: window.innerWidth / 2, y: window.innerHeight / 2 }; // Start in center
+const DAMPING_FACTOR = 0.1; // Lower value = more damping (less responsive, smoother)
+const BLINK_THRESHOLD_MS = 500; // Time window to count rapid blinks
+let blinkCounter = 0;
+
+
+function log(msg, type="log") {
+  const ts = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.textContent = `[${ts}] ${msg}`;
+  if (type === "error") div.style.color = "red";
+  if (type === "event") div.style.color = "cyan";
+  document.getElementById("statusLog").appendChild(div);
+  document.getElementById("statusLog").scrollTop = 99999;
+  console.log(msg); // Ensure terminal visibility if browser console is piped
+}
+
+function drawTrail() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const now = Date.now();
+  trail = trail.filter(p => now - p.t < 3000);
+  for (const p of trail) {
+    const alpha = 1 - (now - p.t) / 3000;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = `rgba(0,255,0,${alpha})`;
+    ctx.fill();
+  }
+}
+
+function detectBlink(gx, gy) {
+  // WebGazer often returns negative coords during blink/loss
+  if (gx < 0 || gy < 0) {
+    const now = Date.now();
+    if (now - lastBlinkTime < BLINK_THRESHOLD_MS) {
+      blinkCounter++;
+      log(`👁️ Blink detected (${blinkCounter})`, "event");
+    } else {
+      blinkCounter = 1; // Reset if blink is too slow
+      log(`👁️ Blink detected (1)`, "event");
+    }
+    lastBlinkTime = now;
+  }
+}
+
+function onGaze(data) {
+  if (!data) return;
+  // Apply exponential smoothing (increased damping)
+  smoothed.x = smoothed.x * (1 - DAMPING_FACTOR) + data.x * DAMPING_FACTOR;
+  smoothed.y = smoothed.y * (1 - DAMPING_FACTOR) + data.y * DAMPING_FACTOR;
+  const x = smoothed.x;
+  const y = smoothed.y;
+  trail.push({x, y, t: Date.now()});
+  drawTrail();
+  detectBlink(data.x, data.y); // Pass raw coords for blink detection heuristic
+}
+
+webgazer.setRegression("ridge");
+webgazer.setGazeListener(onGaze);
+webgazer.begin().then(() => log("🧠 WebGazer Ready", "event"));
+</script>
+</body>
+</html>

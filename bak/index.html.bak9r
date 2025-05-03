@@ -1,0 +1,63 @@
+<!-- PRF‑CALIB‑2025‑04‑30‑CALIB‑FIX‑G1 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Supagrok Gaze Overlay</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; background: black; color: white;
+      overflow: hidden; font-family: monospace; height: 100%; width: 100%;
+    }
+    canvas#overlay {
+      position: fixed; top: 0; left: 0; z-index: 1000; pointer-events: none;
+    }
+    .calib-dot {
+      width: 20px; height: 20px; background: red; border-radius: 50%;
+      position: absolute; z-index: 2000; cursor: pointer;
+    }
+    #statusLog {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: black; color: lime; font: 14px monospace;
+      padding: 6px; overflow-y: auto; z-index: 9999; max-height: 28vh;
+    }
+    #calibUI {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8); color: white;
+      padding: 20px; border: 2px solid lime; z-index: 3000;
+    }
+    .mode-btn {
+      margin: 5px; padding: 10px;
+      background: #222; border: 1px solid #888; color: white;
+      font-family: monospace; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="overlay"></canvas>
+  <div id="statusLog"></div>
+  <div id="calibUI">
+    <h2>Calibration Options</h2>
+    <button class="mode-btn" onclick="launchMode(1)">Mode 1 (Haar Eye)</button>
+    <button class="mode-btn" onclick="launchMode(2)">Mode 2 (DNN Face)</button>
+    <button class="mode-btn" onclick="launchMode(3)">Mode 3 (Facial Mesh)</button>
+    <button class="mode-btn" onclick="finishCalibration()">Close</button>
+  </div>
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+  <script>
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+    let ws = null, trail = [], smoothed = { x: 0, y: 0 };
+
+    function logStatus(msg) {
+      console.log(msg);
+      const div = document.createElement("div");
+      div.textContent = msg;
+      document.getElementById("statusLog").appendChild(div);
+      document.getElementById("statusLog").scrollTop = 999999;
+    }
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      ca

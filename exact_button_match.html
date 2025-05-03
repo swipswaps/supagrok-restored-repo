@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exact Button Match</title>
+    <style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .panel {
+            background-color: #1a1a1a;
+            border: 1px solid #666666;
+            width: 340px;
+            padding: 20px;
+            position: relative;
+        }
+        
+        .panel-title {
+            font-size: 18px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .button {
+            background-color: #2d2d2d;
+            border: 1px solid #666666;
+            color: #ffffff;
+            width: 300px;
+            height: 50px;
+            margin: 10px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .button:hover {
+            background-color: #3d3d3d;
+        }
+        
+        .button.mode1:hover {
+            border-color: #3b82f6;
+        }
+        
+        .button.mode2:hover {
+            border-color: #8b5cf6;
+        }
+        
+        .button.mode3:hover {
+            border-color: #ec4899;
+        }
+        
+        .progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        .mode1 .progress {
+            background-color: #3b82f6; /* Blue */
+        }
+        
+        .mode2 .progress {
+            background-color: #8b5cf6; /* Purple */
+        }
+        
+        .mode3 .progress {
+            background-color: #ec4899; /* Pink */
+        }
+        
+        .exit-button {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: #2d2d2d;
+            border: 1px solid #666666;
+            color: #ffffff;
+            width: 120px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .exit-button:hover {
+            background-color: #3d3d3d;
+            border-color: #ef4444;
+        }
+        
+        .exit-button .progress {
+            background-color: #ef4444; /* Red */
+        }
+        
+        .gaze-indicator {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid #00ff00;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+        
+        .gaze-indicator::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #00ff00;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <div class="exit-button" id="exitButton">
+        EXIT
+        <div class="progress" id="exitProgress"></div>
+    </div>
+    
+    <div class="panel">
+        <div class="panel-title">Calibration Options</div>
+        
+        <div class="button mode1" id="mode1Button">
+            Mode 1 (Haar Eye)
+            <div class="progress" id="mode1Progress"></div>
+        </div>
+        
+        <div class="button mode2" id="mode2Button">
+            Mode 2 (DNN Face)
+            <div class="progress" id="mode2Progress"></div>
+        </div>
+        
+        <div class="button mode3" id="mode3Button">
+            Mode 3 (Nobara)
+            <div class="progress" id="mode3Progress"></div>
+        </div>
+    </div>
+    
+    <div class="gaze-indicator" id="gazeIndicator"></div>
+    
+    <script>
+        // Simulated gaze tracking
+        const gazeIndicator = document.getElementById('gazeIndicator');
+        const exitButton = document.getElementById('exitButton');
+        const exitProgress = document.getElementById('exitProgress');
+        const mode1Button = document.getElementById('mode1Button');
+        const mode1Progress = document.getElementById('mode1Progress');
+        const mode2Button = document.getElementById('mode2Button');
+        const mode2Progress = document.getElementById('mode2Progress');
+        const mode3Button = document.getElementById('mode3Button');
+        const mode3Progress = document.getElementById('mode3Progress');
+        
+        let mouseX = 0;
+        let mouseY = 0;
+        let hoveredButton = null;
+        let dwellTime = 0;
+        let dwellThreshold = 1000; // 1 second
+        let lastTime = Date.now();
+        
+        // Use mouse position as simulated gaze
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            
+            // Update gaze indicator position
+            gazeIndicator.style.left = mouseX + 'px';
+            gazeIndicator.style.top = mouseY + 'px';
+        });
+        
+        // Main update loop
+        function update() {
+            const currentTime = Date.now();
+            const dt = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Check if gaze is on a button
+            const buttons = [
+                { element: exitButton, progress: exitProgress },
+                { element: mode1Button, progress: mode1Progress },
+                { element: mode2Button, progress: mode2Progress },
+                { element: mode3Button, progress: mode3Progress }
+            ];
+            
+            let isHovering = false;
+            
+            for (const button of buttons) {
+                const rect = button.element.getBoundingClientRect();
+                
+                // Add margin for easier selection
+                const margin = 20;
+                if (mouseX >= rect.left - margin && 
+                    mouseX <= rect.right + margin && 
+                    mouseY >= rect.top - margin && 
+                    mouseY <= rect.bottom + margin) {
+                    
+                    isHovering = true;
+                    
+                    // If we just started hovering over this button
+                    if (hoveredButton !== button) {
+                        hoveredButton = button;
+                        dwellTime = 0;
+                    } else {
+                        // Continue dwelling on the same button
+                        dwellTime += dt;
+                        
+                        // Calculate progress
+                        const progress = Math.min(100, (dwellTime / dwellThreshold) * 100);
+                        button.progress.style.width = progress + '%';
+                        
+                        // Check if dwell is complete
+                        if (dwellTime >= dwellThreshold) {
+                            // Button activated
+                            if (button.element === exitButton) {
+                                alert('EXIT button activated');
+                                window.close();
+                            } else {
+                                alert(button.element.textContent.trim() + ' selected');
+                            }
+                            
+                            // Reset dwell
+                            dwellTime = 0;
+                        }
+                    }
+                    
+                    break;
+                }
+            }
+            
+            // If not hovering over any button
+            if (!isHovering) {
+                hoveredButton = null;
+                dwellTime = 0;
+                
+                // Reset all progress bars
+                for (const button of buttons) {
+                    button.progress.style.width = '0%';
+                }
+            }
+            
+            requestAnimationFrame(update);
+        }
+        
+        // Start the update loop
+        update();
+    </script>
+</body>
+</html>

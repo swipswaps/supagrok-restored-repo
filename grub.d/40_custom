@@ -1,0 +1,5 @@
+menuentry 'Nobara Linux 41' {
+    search --no-floppy --fs-uuid --set=root UUID
+    linux /boot/vmlinuz root=UUID=... quiet splash
+    initrd /boot/initrd.img
+}

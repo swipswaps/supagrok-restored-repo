@@ -1,0 +1,39 @@
+127.0.0.1 - - [01/May/2025 06:20:22] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [01/May/2025 06:20:22] code 404, message File not found
+127.0.0.1 - - [01/May/2025 06:20:22] "GET /favicon.ico HTTP/1.1" 404 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 51968)
+Traceback (most recent call last):
+  File "/usr/lib64/python3.11/http/server.py", line 730, in send_head
+    f = open(path, 'rb')
+        ^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/owner/Documents/scripts/AICode/680fddc4-f7f8-8008-a24f-ccde790499ca/app/supagrok_restored_repo/favicon.ico'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib64/python3.11/socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib64/python3.11/http/server.py", line 1310, in finish_request
+    self.RequestHandlerClass(request, client_address, self,
+  File "/usr/lib64/python3.11/http/server.py", line 671, in __init__
+    super().__init__(*args, **kwargs)
+  File "/usr/lib64/python3.11/socketserver.py", line 755, in __init__
+    self.handle()
+  File "/usr/lib64/python3.11/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib64/python3.11/http/server.py", line 424, in handle_one_request
+    method()
+  File "/usr/lib64/python3.11/http/server.py", line 675, in do_GET
+    f = self.send_head()
+        ^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.11/http/server.py", line 732, in send_head
+    self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+  File "/usr/lib64/python3.11/http/server.py", line 491, in send_error
+    self.wfile.write(body)
+  File "/usr/lib64/python3.11/socketserver.py", line 834, in write
+    self._sock.sendall(b)
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+127.0.0.1 - - [01/May/2025 06:20:53] "GET /index.html HTTP/1.1" 304 -
+127.0.0.1 - - [01/May/2025 06:21:00] "GET /index.html HTTP/1.1" 304 -

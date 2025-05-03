@@ -1,0 +1,137 @@
+<!-- Full PRF‑CALIB‑2025‑04‑29‑HYBRID‑DUAL‑TRACK HTML -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Supagrok Gaze Hybrid Tracker</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: black; overflow: hidden; color: white; font-family: sans-serif; height: 100%; width: 100%; }
+    canvas#overlay { position: fixed; top: 0; left: 0; z-index: 1000; pointer-events: none; }
+    .calib-dot { width: 20px; height: 20px; background: red; border-radius: 50%; position: absolute; z-index: 2000; cursor: pointer; }
+    #main { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1500; }
+  </style>
+</head>
+<body>
+  <canvas id="overlay"></canvas>
+  <div id="main">
+    <h1>Supagrok BootShield</h1>
+    <button onclick="fetch('/launchers/launch_nobara.sh')">Launch OS</button>
+  </div>
+
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+  <script>
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+    let trail = [], log = [], lastGaze = null;
+    let currentModel = 'ridge';
+    let currentDot = 0;
+    const smoothingFactor = 0.2;
+    let smoothed = { x: 0, y: 0 };
+
+    const calibrationPoints = [
+      [0.1, 0.1], [0.5, 0.1], [0.9, 0.1],
+      [0.1, 0.5], [0.5, 0.5], [0.9, 0.5],
+      [0.1, 0.9], [0.5, 0.9], [0.9, 0.9]
+    ];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    function placeCalibrationDot([xRatio, yRatio]) {
+      const dot = document.createElement("div");
+      dot.className = "calib-dot";
+      dot.style.left = `${window.innerWidth * xRatio - 10}px`;
+      dot.style.top = `${window.innerHeight * yRatio - 10}px`;
+      dot.onclick = () => {
+        const tx = dot.offsetLeft + 10, ty = dot.offsetTop + 10;
+        if (lastGaze) {
+          const dx = lastGaze.x - tx;
+          const dy = lastGaze.y - ty;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          log.push({ t: Date.now(), tx, ty, gx: lastGaze.x, gy: lastGaze.y, dist, model: currentModel });
+        }
+        webgazer.recordScreenPosition(tx, ty, "click");
+        dot.remove();
+        currentDot++;
+        if (currentDot < calibrationPoints.length) placeCalibrationDot(calibrationPoints[currentDot]);
+        else finishCalibration();
+      };
+      document.body.appendChild(dot);
+    }
+
+    function finishCalibration() {
+      console.log("✅ Calibration complete");
+      webgazer.saveData();
+      document.getElementById("main").style.display = "block";
+    }
+
+    function drawTrail() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const now = Date.now();
+      trail = trail.filter(p => now - p.t < 3000);
+      for (const p of trail) {
+        const alpha = 1 - (now - p.t) / 3000;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = `rgba(0,255,0,${alpha})`;
+        ctx.fill();
+      }
+    }
+
+    function setModel(type) {
+      currentModel = type;
+      webgazer.setRegression(type);
+      console.log(`🧠 Switched to ${type} model`);
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    webgazer.setRegression("ridge");
+    webgazer.params.storingPoints = true;
+    webgazer.params.useMouseAccuracy = false;
+
+    webgazer.setGazeListener((data) => {
+      if (!data) return;
+      lastGaze = data;
+      smoothed.x = smoothed.x * (1 - smoothingFactor) + data.x * smoothingFactor;
+      smoothed.y = smoothed.y * (1 - smoothingFactor) + data.y * smoothingFactor;
+      trail.push({ x: smoothed.x, y: smoothed.y, t: Date.now() });
+      drawTrail();
+    });
+
+    webgazer.begin().then(() => {
+      console.log("🟢 WebGazer ready");
+      placeCalibrationDot(calibrationPoints[currentDot]);
+      if (!document.getElementById("webgazerVideoFeed")) {
+        const v = document.createElement("video");
+        v.id = "webgazerVideoFeed";
+        document.body.appendChild(v);
+      }
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "e") {
+        const blob = new Blob([JSON.stringify(log, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `gaze_log_${Date.now()}.json`;
+        a.click();
+      }
+      if (e.key === "r") {
+        currentDot = 0;
+        document.querySelectorAll(".calib-dot").forEach(dot => dot.remove());
+        placeCalibrationDot(calibrationPoints[currentDot]);
+        console.log("🔁 Restarting calibration");
+      }
+      if (e.key === "1") setModel("ridge");
+      if (e.key === "2") setModel("polynomial");
+      if (e.key === "d") {
+        console.table(log.slice(-5));
+      }
+    });
+  </script>
+</body>
+</html>

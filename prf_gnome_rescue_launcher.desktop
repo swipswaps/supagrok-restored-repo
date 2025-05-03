@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=🛠 GRUB Rescue (Self-Heal)
+Comment=Launch automatic GRUB repair and snapshot restore
+Exec=gnome-terminal -- bash -c "./prf_gnome_rescue_launcher.sh; exec bash"
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=System;Utility;
+StartupNotify=true

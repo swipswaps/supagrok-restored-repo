@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Supagrok Gaze Tracker</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: black; color: white;
+      font-family: sans-serif;
+      overflow: hidden; height: 100%; width: 100%;
+    }
+    canvas#overlay {
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .calib-button {
+      background: #222;
+      color: white;
+      padding: 8px;
+      margin: 4px;
+      border: 1px solid white;
+      cursor: pointer;
+    }
+    #statusLog {
+      position: fixed; bottom: 0;
+      left: 0; right: 0;
+      color: lime; font: 12px monospace;
+      background: black; z-index: 9999;
+      max-height: 25vh; overflow: auto; padding: 6px;
+    }
+    #modal {
+      position: fixed; top: 10%; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.9);
+      padding: 20px; z-index: 2000;
+      border: 2px solid lime;
+    }
+  </style>
+</head>
+<body>
+<canvas id="overlay"></canvas>
+<div id="modal">
+  <h2>Choose Calibration Mode</h2>
+  <button class="calib-button" onclick="setMode('haar')">Haar Eye</button>
+  <button class="calib-button" onclick="setMode('dnn')">DNN Face</button>
+  <button class="calib-button" onclick="setMode('mesh')">Facial Mesh</button>
+  <button class="calib-button" onclick="closeModal()">Close</button>
+</div>
+<div id="statusLog"></div>
+
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script>
+let ctx, canvas, ws = null;
+let trail = [], smoothed = { x: 0, y: 0 };
+let mode = "auto";
+
+function closeModal() {
+  document.getElementById("modal").style.display = "none";
+  console.log("[sys] Modal closed by user.");
+  logStatus("✅ Calibration closed.");
+}
+
+function logStatus(msg) {
+  const logDiv = document.getElementById("statusLog");
+  const entry = document.createElement("div");
+  entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logDiv.appendChild(entry);
+  logDiv.scrollTop = logDiv.scrollHeight;
+  console.log("[log]", msg);
+}
+
+function connectWebSocket() {
+  try {
+    ws = new WebSocket("ws://localhost:8765");
+    ws.onopen = () => logStatus("WebSocket connected");
+    ws.onerror = () => logStatus("❌ WebSocket error.");
+  } catch (e) {
+    logStatus("❌ WS connection failed.");
+  }
+}
+
+function drawTrail() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const now = Date.now();
+  for (const p of trail.filter(p => now - p.t < 3000)) {
+    const alpha = 1 - (now - p.t) / 3000;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+    ctx.fillStyle = `rgba(0,255,0,${alpha})`;
+    ctx.fill();
+  }
+}
+
+function setMode(m) {
+  mode = m;
+  logStatus("🔧 Mode set to: " + m);
+  closeModal();
+}
+
+function startTracking() {
+  webgazer.setRegression("ridge");
+  webgazer.showVideoPreview(true).showFaceOverlay(true).showPredictionPoints(true);
+  webgazer.setGazeListener(data => {
+    if (!data) return;
+    smoothed.x = smoothed.x * 0.8 + data.x * 0.2;
+    smoothed.y = smoothed.y * 0.8 + data.y * 0.2;
+    trail.push({ x: smoothed.x, y: smoothed.y, t: Date.now() });
+    drawTrail();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ x: data.x, y: data.y }));
+    }
+  });
+  webgazer.begin().then(() => logStatus("🧠 WebGazer initialized")).catch(e => {
+    logStatus("❌ WebGazer error: " + e);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  canvas = document.getElementById("overlay");
+  ctx = canvas.getContext("2d");
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  connectWebSocket();
+  startTracking();
+});
+
+window.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeModal();
+});
+</script>
+</body>
+</html>

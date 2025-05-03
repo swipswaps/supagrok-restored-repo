@@ -1,0 +1,113 @@
+<!-- PRF‑CALIB‑2025‑04‑30‑F‑RESTORED‑ASL‑BASE -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Supagrok Gaze Overlay</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: black; color: white;
+      overflow: hidden;
+      height: 100%; width: 100%;
+      font-family: monospace;
+    }
+    canvas#overlay {
+      position: fixed; top: 0; left: 0;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    #statusLog {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(0, 0, 0, 0.85);
+      color: lime; font-size: 14px;
+      font-family: monospace;
+      padding: 5px;
+      max-height: 25vh;
+      overflow-y: auto;
+      z-index: 2000;
+    }
+    .calib-dot {
+      width: 20px; height: 20px;
+      background: red; border-radius: 50%;
+      position: absolute; z-index: 1500;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="overlay" width="800" height="600"></canvas>
+  <div id="statusLog">🟢 Initialized overlay environment...</div>
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const canvas = document.getElementById('overlay');
+      const ctx = canvas.getContext('2d');
+      const trail = [];
+      let ws = null;
+      let smoothed = { x: 0, y: 0 };
+
+      function logStatus(msg) {
+        const line = document.createElement("div");
+        line.textContent = msg;
+        document.getElementById("statusLog").appendChild(line);
+        document.getElementById("statusLog").scrollTop = 99999;
+        console.log(msg);
+      }
+
+      function drawTrail() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const now = Date.now();
+        for (const p of trail.filter(pt => now - pt.t < 3000)) {
+          const alpha = 1 - (now - p.t) / 3000;
+          ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+          ctx.fillStyle = `rgba(0,255,0,${alpha})`;
+          ctx.fill();
+        }
+      }
+
+      function connectWebSocket() {
+        try {
+          ws = new WebSocket("ws://localhost:8765");
+          ws.onopen = () => logStatus("🟢 WebSocket connected.");
+          ws.onerror = err => logStatus("❌ WS error: " + (err?.message || 'undefined'));
+        } catch (e) {
+          logStatus("❌ WebSocket connection failed: " + e);
+        }
+      }
+
+      function initGaze() {
+        try {
+          webgazer.setRegression("ridge");
+          webgazer.setGazeListener(data => {
+            if (!data) return;
+            smoothed.x = 0.8 * smoothed.x + 0.2 * data.x;
+            smoothed.y = 0.8 * smoothed.y + 0.2 * data.y;
+            trail.push({ x: smoothed.x, y: smoothed.y, t: Date.now() });
+            drawTrail();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify(data));
+            }
+          });
+          webgazer.begin()
+            .then(() => logStatus("🧠 WebGazer loaded."))
+            .catch(e => logStatus("❌ WebGazer init failed: " + e));
+        } catch (e) {
+          logStatus("❌ WebGazer JS error: " + e.message);
+        }
+      }
+
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+
+      resize();
+      connectWebSocket();
+      initGaze();
+
+      window.addEventListener("resize", resize);
+    });
+  </script>
+</body>
+</html>

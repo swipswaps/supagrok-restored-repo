@@ -1,0 +1,142 @@
+<!-- PRF‑CALIB‑2025‑04‑30‑K‑CLOSURE‑FIX -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Supagrok Gaze + Modal Fix</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; background: black; color: white;
+      font-family: monospace; height: 100%; overflow: hidden;
+    }
+    canvas#overlay {
+      position: absolute; top: 0; left: 0; pointer-events: none;
+      z-index: 10;
+    }
+    #statusLog {
+      position: fixed; bottom: 0; left: 0; width: 100%;
+      background: black; color: lime; font: 14px monospace;
+      max-height: 30vh; overflow-y: auto; z-index: 100;
+      padding: 4px; border-top: 1px solid lime;
+    }
+    .calib-dot {
+      width: 20px; height: 20px; background: red; border-radius: 50%;
+      position: absolute; z-index: 15; cursor: pointer;
+    }
+    #calibModal {
+      position: fixed; top: 20%; left: 20%; width: 60%;
+      background: #111; color: lime; border: 2px solid lime;
+      padding: 20px; z-index: 200; display: block; text-align: center;
+    }
+    #calibModal button {
+      font-size: 16px; margin: 6px; padding: 8px 16px;
+      background: black; color: lime; border: 1px solid lime;
+    }
+  </style>
+</head>
+<body>
+<canvas id="overlay" width="1280" height="720"></canvas>
+<div id="statusLog">[Booting...]</div>
+
+<div id="calibModal">
+  <h2>Select Tracking Mode</h2>
+  <button onclick="selectMode(1)">🧠 Haar (CPU)</button>
+  <button onclick="selectMode(2)">📦 DNN (GPU)</button>
+  <button onclick="selectMode(3)">🌐 Mesh (WebGazer)</button>
+  <br><br>
+  <button onclick="exitCalibration()">❌ Close</button>
+</div>
+
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script>
+const canvas = document.getElementById("overlay");
+const ctx = canvas.getContext("2d");
+let trail = [], currentDot = 0;
+let kalmanX = new KalmanFilter(), kalmanY = new KalmanFilter();
+
+function KalmanFilter() {
+  let A=1,H=1,Q=0.01,R=1,P=1,x=0;
+  this.filter = function(z) {
+    x = A*x; P = A*P*A + Q;
+    let K = P*H/(H*P*H+R);
+    x = x + K*(z - H*x);
+    P = (1 - K*H)*P;
+    return x;
+  };
+}
+
+function logStatus(msg, type="log") {
+  const ts = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.textContent = `[${ts}] ${msg}`;
+  if (type === "error") div.style.color = "red";
+  if (type === "event") div.style.color = "cyan";
+  document.getElementById("statusLog").appendChild(div);
+  document.getElementById("statusLog").scrollTop = 99999;
+  console.log(`[${type.toUpperCase()}] ${msg}`);
+}
+
+function drawTrail() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const now = Date.now();
+  trail = trail.filter(p => now - p.t < 3000);
+  for (const p of trail) {
+    const a = 1 - (now - p.t) / 3000;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+    ctx.fillStyle = `rgba(0,255,0,${a})`; ctx.fill();
+  }
+}
+
+function onGaze(data) {
+  if (!data) return;
+  let x = kalmanX.filter(data.x);
+  let y = kalmanY.filter(data.y);
+  trail.push({x, y, t: Date.now()});
+  drawTrail();
+}
+
+function exitCalibration() {
+  const modal = document.getElementById("calibModal");
+  if (modal && modal.parentNode) {
+    modal.parentNode.removeChild(modal);
+    logStatus("✅ Calibration window removed from DOM", "event");
+  }
+  webgazer.pause();
+}
+
+function selectMode(n) {
+  logStatus(`🔄 Tracking mode ${n} selected`, "event");
+  exitCalibration();
+  webgazer.resume();
+}
+
+function placeDot(xr, yr) {
+  const dot = document.createElement("div");
+  dot.className = "calib-dot";
+  dot.style.left = `${window.innerWidth * xr - 10}px`;
+  dot.style.top = `${window.innerHeight * yr - 10}px`;
+  dot.onclick = async () => {
+    const pred = await webgazer.getCurrentPrediction();
+    if (pred) {
+      logStatus(`📍 Dot clicked. Pred: ${Math.round(pred.x)}, ${Math.round(pred.y)}`, "event");
+    }
+    dot.remove();
+    currentDot++;
+    if (currentDot < calibPoints.length) placeDot(...calibPoints[currentDot]);
+    else exitCalibration();
+  };
+  document.body.appendChild(dot);
+}
+
+const calibPoints = [[0.1,0.1],[0.9,0.1],[0.5,0.5],[0.1,0.9],[0.9,0.9]];
+
+webgazer.setRegression("ridge");
+webgazer.setGazeListener(onGaze);
+
+webgazer.begin().then(() => {
+  logStatus("🧠 WebGazer ready", "event");
+  placeDot(...calibPoints[currentDot]);
+}).catch(e => logStatus("❌ Init fail: " + e.message, "error"));
+</script>
+</body>
+</html>

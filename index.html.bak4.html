@@ -1,0 +1,784 @@
+<!-- PRF‑MEDIAPIPE‑POLYCALIB‑NOSCALE‑2025‑05‑02 -->
+<!DOCTYPE html>
+<!-- Directive: PRF‑MEDIAPIPE‑POLYCALIB‑NOSCALE‑2025‑05‑02 -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Supagrok Gaze Activation (MediaPipe + Poly Calib)</title>
+    <!-- Load MediaPipe libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <!-- Use Face Mesh for landmarks including eyelids for blink detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <style>
+        html, body {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            background: black; color: white; overflow: hidden;
+            font-family: monospace; cursor: none; /* Hide default cursor */
+        }
+        #output_canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10;
+        }
+        #statusLog {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: rgba(0,0,0,0.7); color: lime;
+            font: 12px monospace; max-height: 25vh;
+            overflow-y: auto; z-index: 1000; padding: 5px;
+            border-top: 1px solid lime;
+        }
+        .gaze-indicator {
+            position: absolute;
+            width: 24px; height: 24px; /* Slightly larger */
+            border: 2px solid cyan; /* Different color */
+            border-radius: 50%;
+            background-color: rgba(0, 255, 255, 0.3);
+            pointer-events: none;
+            z-index: 950;
+            transform: translate(-50%, -50%); /* Center the dot */
+            transition: top 0.03s linear, left 0.03s linear; /* Faster transition */
+            box-shadow: 0 0 10px cyan;
+        }
+        .gaze-button {
+            position: absolute;
+            padding: 15px 25px;
+            background: #1a1a1a; color: #e0e0e0;
+            border: 2px solid #444;
+            border-radius: 5px;
+            cursor: pointer; /* Keep pointer for manual click fallback */
+            z-index: 900;
+            text-align: center;
+            font-size: 16px;
+            overflow: hidden;
+            transition: background-color 0.2s, border-color 0.2s;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+        .gaze-button:hover, .gaze-button.dwelling {
+             background-color: #333;
+             border-color: lime;
+             box-shadow: 0 0 15px lime;
+        }
+        .progress-bar {
+            position: absolute;
+            bottom: 0; left: 0; height: 5px;
+            background-color: lime;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        /* Calibration UI */
+        #calibrationOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            text-align: center;
+        }
+        #calibrationInstructions {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+        #calibrationPoint {
+            position: absolute;
+            width: 30px; height: 30px;
+            background-color: red;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 15px red;
+            transform: translate(-50%, -50%);
+            display: none; /* Hidden until calibration starts */
+        }
+        #startCalibrationBtn {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            background-color: #004d00;
+            color: lime;
+            border: 2px solid lime;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+         #startCalibrationBtn:hover {
+             background-color: #006600;
+         }
+    </style>
+</head>
+<body>
+    <!-- Hidden video element for camera input -->
+    <video class="input_video" style="display: none;"></video>
+    <!-- Canvas for drawing overlays (like face mesh, optional) -->
+    <canvas id="output_canvas" width="1280" height="720"></canvas>
+    <!-- Gaze indicator element -->
+    <div class="gaze-indicator" id="gazeIndicator"></div>
+    <!-- Status Log -->
+    <div id="statusLog">[👁️ Initializing MediaPipe...]</div>
+
+    <!-- Buttons -->
+    <!-- Row 1 -->
+    <div class="gaze-button" id="btn-nobara" style="top:20%;left:10%;" onclick="log('✅ Nobara activated', 'event')">🖥️ Start Nobara<div class="progress-bar"></div></div>
+    <div class="gaze-button" id="btn-windows" style="top:20%;left:35%;" onclick="log('✅ Windows activated', 'event')">🪟 Boot Windows<div class="progress-bar"></div></div>
+    <div class="gaze-button" id="btn-fixgrub" style="top:20%;left:60%;" onclick="log('✅ Fix GRUB activated', 'event')">🪛 Fix GRUB<div class="progress-bar"></div></div>
+    <!-- Row 2 -->
+    <div class="gaze-button" id="btn-rollback" style="top:45%;left:10%;" onclick="log('✅ Rollback activated', 'event')">🔁 Rollback<div class="progress-bar"></div></div>
+    <div class="gaze-button" id="btn-testkern" style="top:45%;left:35%;" onclick="log('✅ Test Kernel activated', 'event')">🧪 Test Kernel<div class="progress-bar"></div></div>
+    <div class="gaze-button" id="btn-rescue" style="top:45%;left:60%;" onclick="log('✅ Rescue activated', 'event')">🧿 Boot Rescue<div class="progress-bar"></div></div>
+    <!-- Row 3 -->
+    <div class="gaze-button" id="btn-manual" style="top:70%;left:10%;" onclick="log('✅ Manual Boot activated', 'event')">🧵 Manual Boot<div class="progress-bar"></div></div>
+    <div class="gaze-button" id="btn-exit" style="top:70%;left:35%;" onclick="log('❌ Exit/Reboot activated', 'event')">🚪 Exit/Reboot<div class="progress-bar"></div></div>
+    <!-- Calibration Button (Initially hidden, shown if calibration needed) -->
+     <button id="startCalibrationBtn" style="position: fixed; top: 10px; right: 10px; z-index: 1001;">Calibrate Gaze</button>
+
+    <!-- Calibration Overlay -->
+    <div id="calibrationOverlay">
+        <div id="calibrationInstructions">Look directly at the red dot.</div>
+        <div id="calibrationPoint"></div>
+        <!-- Button to start calibration is moved outside overlay -->
+    </div>
+
+
+<script type="module">
+    const videoElement = document.getElementsByClassName('input_video')[0];
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const gazeIndicator = document.getElementById('gazeIndicator');
+    const statusLog = document.getElementById('statusLog');
+    const calibrationOverlay = document.getElementById('calibrationOverlay');
+    const calibrationPoint = document.getElementById('calibrationPoint');
+    const calibrationInstructions = document.getElementById('calibrationInstructions');
+    const startCalibrationBtn = document.getElementById('startCalibrationBtn');
+
+    // --- State ---
+    let appState = 'INITIALIZING'; // INITIALIZING, RUNNING, CALIBRATING, ERROR
+    let smoothedGaze = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    let lastBlinkTime = 0;
+    let dwellTarget = null;
+    let dwellStartTime = 0;
+    let calibrationData = []; // Stores { screen: {x, y}, features: {lx, ly, rx, ry} }
+    let calibrationModel = null; // Stores the trained mapping function parameters
+    let currentCalibrationTarget = 0;
+    let isCalibrated = false;
+    let calibrationSamples = [];
+
+    // --- Constants ---
+    const DAMPING_FACTOR = 0.1; // Lower = smoother
+    const BLINK_THRESHOLD_MS = 400; // Blink debounce time
+    const BLINK_CLOSE_THRESHOLD = 0.015; // Eyelid distance threshold (normalized)
+    const DWELL_TIME_MS = 1500; // Time to activate button
+    const CALIBRATION_POINTS = [ // Screen coordinates (percentage)
+        { x: 0.1, y: 0.1 }, { x: 0.5, y: 0.1 }, { x: 0.9, y: 0.1 },
+        { x: 0.1, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.9, y: 0.5 },
+        { x: 0.1, y: 0.9 }, { x: 0.5, y: 0.9 }, { x: 0.9, y: 0.9 },
+    ];
+    const SAMPLES_PER_POINT = 60; // Number of frames to collect data per point
+    const REQUIRED_LANDMARKS = [
+        // Pupils (from refineLandmarks=true)
+        468, // Right pupil center
+        473, // Left pupil center
+        // Eyelids (for blink detection)
+        159, 145, // Left upper/lower
+        386, 374, // Right upper/lower
+        // Eye corners (for normalization)
+        33, 133, // Left inner/outer
+        362, 263 // Right inner/outer
+    ];
+    const CALIBRATION_STORAGE_KEY = 'supagrokGazeCalibration';
+    const GAZE_SCALING_FACTOR = 1.0; // Set to 1.0 to disable scaling initially
+
+    // --- Logging ---
+    function log(msg, type = "log") {
+        const ts = new Date().toLocaleTimeString();
+        const div = document.createElement("div");
+        div.textContent = `[${ts}] ${msg}`;
+        if (type === "error") div.style.color = "red";
+        if (type === "event") div.style.color = "cyan";
+        if (type === "warn") div.style.color = "yellow";
+        if (type === "calib") div.style.color = "magenta";
+        statusLog.appendChild(div);
+        statusLog.scrollTop = statusLog.scrollHeight;
+        console.log(msg);
+    }
+
+    // --- Landmark Extraction ---
+    function getEyeFeatures(landmarks) {
+        // Check if all required landmarks are present
+        for (const index of REQUIRED_LANDMARKS) {
+            if (!landmarks[index] || landmarks[index].visibility < 0.5) { // Check visibility too
+                // log(`⚠️ Missing or low visibility landmark: ${index}`, "warn");
+                return null; // Incomplete data
+            }
+        }
+
+        // Extract pupil centers (relative to image size)
+        const leftPupil = landmarks[473];
+        const rightPupil = landmarks[468];
+
+        // Extract eyelid landmarks for blink detection
+        const leftUpper = landmarks[159];
+        const leftLower = landmarks[145];
+        const rightUpper = landmarks[386];
+        const rightLower = landmarks[374];
+
+        // Extract corner landmarks for normalization
+        const leftInner = landmarks[133];
+        const leftOuter = landmarks[33];
+        const rightInner = landmarks[362];
+        const rightOuter = landmarks[263];
+
+
+        return {
+            pupils: {
+                left: { x: leftPupil.x, y: leftPupil.y },
+                right: { x: rightPupil.x, y: rightPupil.y }
+            },
+            eyelids: {
+                leftUpperY: leftUpper.y, leftLowerY: leftLower.y,
+                rightUpperY: rightUpper.y, rightLowerY: rightLower.y
+            },
+            corners: {
+                leftInnerX: leftInner.x, leftOuterX: leftOuter.x,
+                rightInnerX: rightInner.x, rightOuterX: rightOuter.x
+            }
+        };
+    }
+
+
+    // --- Gaze Calculation ---
+    function calculateGazePoint(features) {
+        if (!features) return null;
+
+        let predX, predY;
+
+        // ** If Calibration Model Exists and Valid, Use It **
+        if (calibrationModel && isCalibrated) {
+            try {
+                let feats;
+                if (calibrationModel.type === "polynomialRegression2") {
+                    // Polynomial features: [1, lx, ly, rx, ry, lx*lx, lx*ly, lx*rx, lx*ry, ly*ly, ly*rx, ly*ry, rx*rx, rx*ry, ry*ry] (15 terms)
+                    const lx = features.pupils.left.x, ly = features.pupils.left.y;
+                    const rx = features.pupils.right.x, ry = features.pupils.right.y;
+                    feats = [1, lx, ly, rx, ry, lx*lx, lx*ly, lx*rx, lx*ry, ly*ly, ly*rx, ly*ry, rx*rx, rx*ry, ry*ry];
+                } else { // Fallback or old linear model
+                    // Linear features: [1 (intercept), left_x, left_y, right_x, right_y]
+                    feats = [1, features.pupils.left.x, features.pupils.left.y, features.pupils.right.x, features.pupils.right.y];
+                }
+
+                // Ensure coefficient array length matches feature vector length
+                if (calibrationModel.coeffsX.length !== feats.length || calibrationModel.coeffsY.length !== feats.length) {
+                     throw new Error(`Coefficient length (${calibrationModel.coeffsX.length}) mismatch with feature length (${feats.length}) for model type ${calibrationModel.type}`);
+                }
+
+                predX = dotProduct(calibrationModel.coeffsX, feats);
+                predY = dotProduct(calibrationModel.coeffsY, feats);
+
+            } catch (error) {
+                 log(`❌ Error during gaze prediction: ${error.message}`, "error");
+                 console.error(error);
+                 // Fallback to heuristic if prediction fails
+                 isCalibrated = false; // Mark as uncalibrated to avoid repeated errors
+                 calibrationModel = null;
+                 localStorage.removeItem(CALIBRATION_STORAGE_KEY);
+                 log("⚠️ Reverting to heuristic gaze calculation due to prediction error.", "warn");
+                 // Force heuristic calculation below
+                 predX = null;
+                 predY = null;
+            }
+        }
+
+        // ** Fallback Heuristic or if prediction failed **
+        if (predX === null || predY === null || !isCalibrated) {
+            const midX = (features.pupils.left.x + features.pupils.right.x) / 2;
+            const midY = (features.pupils.left.y + features.pupils.right.y) / 2;
+            // Map normalized coordinates to screen coordinates
+            // Invert X assuming mirrored camera view
+            predX = (1 - midX) * window.innerWidth;
+            predY = midY * window.innerHeight;
+            // Set isCalibrated to false if we fell back here
+            if (isCalibrated) {
+                log("ℹ️ Using heuristic calculation despite loaded model.", "warn");
+                isCalibrated = false;
+            }
+        }
+
+        // Apply scaling factor relative to screen center (Only if factor is not 1.0)
+        let finalX = predX;
+        let finalY = predY;
+        if (GAZE_SCALING_FACTOR !== 1.0) {
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            finalX = centerX + (predX - centerX) * GAZE_SCALING_FACTOR;
+            finalY = centerY + (predY - centerY) * GAZE_SCALING_FACTOR;
+        }
+
+
+        // Clamp after scaling (or directly if no scaling)
+        const clampedX = Math.max(0, Math.min(window.innerWidth, finalX));
+        const clampedY = Math.max(0, Math.min(window.innerHeight, finalY));
+        return { x: clampedX, y: clampedY };
+    }
+
+    // --- Blink Detection ---
+    function detectBlink(features) {
+        if (!features) return false;
+
+        const leftDist = Math.abs(features.eyelids.leftUpperY - features.eyelids.leftLowerY);
+        const rightDist = Math.abs(features.eyelids.rightUpperY - features.eyelids.rightLowerY);
+
+        // Normalize by eye width estimate
+        const leftEyeWidth = Math.abs(features.corners.leftOuterX - features.corners.leftInnerX);
+        const rightEyeWidth = Math.abs(features.corners.rightOuterX - features.corners.rightInnerX);
+
+        const normLeftDist = leftDist / (leftEyeWidth + 1e-6); // Avoid division by zero
+        const normRightDist = rightDist / (rightEyeWidth + 1e-6);
+
+        if (normLeftDist < BLINK_CLOSE_THRESHOLD && normRightDist < BLINK_CLOSE_THRESHOLD) {
+            const now = Date.now();
+            if (now - lastBlinkTime > BLINK_THRESHOLD_MS) {
+                 log("👁️ Blink detected", "event");
+                 lastBlinkTime = now;
+                 return true;
+            }
+        }
+        return false;
+    }
+
+    // --- Dwell Activation ---
+     function updateProgressBar(button, percentage) {
+        const bar = button.querySelector('.progress-bar');
+        if (bar) {
+            bar.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
+        }
+    }
+
+    function checkDwell(gazeX, gazeY) {
+        if (appState !== 'RUNNING') return; // Only check dwell when running
+
+        const buttons = document.querySelectorAll(".gaze-button");
+        let currentTarget = null;
+
+        buttons.forEach(btn => btn.classList.remove('dwelling'));
+
+        for (const btn of buttons) {
+            const rect = btn.getBoundingClientRect();
+            if (gazeX >= rect.left && gazeX <= rect.right && gazeY >= rect.top && gazeY <= rect.bottom) {
+                currentTarget = btn;
+                btn.classList.add('dwelling');
+                break;
+            }
+        }
+
+        if (currentTarget) {
+            if (dwellTarget !== currentTarget) {
+                dwellTarget = currentTarget;
+                dwellStartTime = Date.now();
+                updateProgressBar(dwellTarget, 0);
+                log(`⏳ Dwelling on ${dwellTarget.id}...`);
+            } else {
+                const elapsed = Date.now() - dwellStartTime;
+                const progress = (elapsed / DWELL_TIME_MS) * 100;
+                updateProgressBar(dwellTarget, progress);
+
+                if (elapsed >= DWELL_TIME_MS) {
+                    log(`✅ Activated ${dwellTarget.id} via dwell!`, "event");
+                    dwellTarget.click();
+                    updateProgressBar(dwellTarget, 0);
+                    dwellTarget.classList.remove('dwelling');
+                    dwellTarget = null;
+                    dwellStartTime = 0;
+                }
+            }
+        } else {
+            if (dwellTarget) {
+                log(`🚫 Stopped dwelling on ${dwellTarget.id}`);
+                updateProgressBar(dwellTarget, 0);
+                dwellTarget.classList.remove('dwelling');
+                dwellTarget = null;
+                dwellStartTime = 0;
+            }
+        }
+    }
+
+    // --- Calibration Logic ---
+    function startCalibration() {
+        log("Starting calibration...", "calib");
+        appState = 'CALIBRATING';
+        calibrationData = [];
+        currentCalibrationTarget = 0;
+        calibrationOverlay.style.display = 'flex';
+        gazeIndicator.style.display = 'none'; // Hide gaze dot during calibration
+        showNextCalibrationPoint();
+    }
+
+    function showNextCalibrationPoint() {
+        if (currentCalibrationTarget >= CALIBRATION_POINTS.length) {
+            finishCalibration();
+            return;
+        }
+
+        const point = CALIBRATION_POINTS[currentCalibrationTarget];
+        const screenX = point.x * window.innerWidth;
+        const screenY = point.y * window.innerHeight;
+
+        calibrationPoint.style.left = `${screenX}px`;
+        calibrationPoint.style.top = `${screenY}px`;
+        calibrationPoint.style.display = 'block';
+        calibrationInstructions.textContent = `Look directly at the red dot (${currentCalibrationTarget + 1}/${CALIBRATION_POINTS.length})`;
+        calibrationSamples = []; // Reset samples for the new point
+        log(`Calibrating point ${currentCalibrationTarget + 1}: (${screenX.toFixed(0)}, ${screenY.toFixed(0)})`, "calib");
+    }
+
+    function collectCalibrationSample(features) {
+        if (appState !== 'CALIBRATING' || !features || calibrationSamples.length >= SAMPLES_PER_POINT) {
+            return;
+        }
+
+        // Store relevant features (pupil positions)
+        calibrationSamples.push({
+            left: features.pupils.left,
+            right: features.pupils.right
+        });
+
+        // Update instructions with progress
+        calibrationInstructions.textContent = `Look directly at the red dot... Collecting data (${calibrationSamples.length}/${SAMPLES_PER_POINT})`;
+
+
+        if (calibrationSamples.length === SAMPLES_PER_POINT) {
+            // Calculate average features for this point
+            let avgLx = 0, avgLy = 0, avgRx = 0, avgRy = 0;
+            calibrationSamples.forEach(s => {
+                avgLx += s.left.x; avgLy += s.left.y;
+                avgRx += s.right.x; avgRy += s.right.y;
+            });
+            avgLx /= SAMPLES_PER_POINT; avgLy /= SAMPLES_PER_POINT;
+            avgRx /= SAMPLES_PER_POINT; avgRy /= SAMPLES_PER_POINT;
+
+            const currentPoint = CALIBRATION_POINTS[currentCalibrationTarget];
+            calibrationData.push({
+                screen: { x: currentPoint.x * window.innerWidth, y: currentPoint.y * window.innerHeight },
+                features: { lx: avgLx, ly: avgLy, rx: avgRx, ry: avgRy }
+            });
+            log(`Collected data for point ${currentCalibrationTarget + 1}`, "calib");
+
+            currentCalibrationTarget++;
+            calibrationPoint.style.display = 'none'; // Hide point briefly
+            setTimeout(showNextCalibrationPoint, 500); // Move to next point after a short delay
+        }
+    }
+
+    // --- Simple Matrix Math for Linear Regression ---
+    function transpose(matrix) {
+        if (!matrix || matrix.length === 0) return [];
+        return matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]));
+    }
+
+    function multiply(matrixA, matrixB) {
+        const rowsA = matrixA.length, colsA = matrixA[0].length;
+        const rowsB = matrixB.length, colsB = matrixB[0].length;
+        if (colsA !== rowsB) throw new Error("Matrix dimensions incompatible for multiplication");
+
+        const result = Array(rowsA).fill(0).map(() => Array(colsB).fill(0));
+        for (let i = 0; i < rowsA; i++) {
+            for (let j = 0; j < colsB; j++) {
+                for (let k = 0; k < colsA; k++) {
+                    result[i][j] += matrixA[i][k] * matrixB[k][j];
+                }
+            }
+        }
+        return result;
+    }
+
+    function dotProduct(vectorA, vectorB) {
+         if (vectorA.length !== vectorB.length) throw new Error(`Vector dimensions incompatible for dot product: ${vectorA.length} vs ${vectorB.length}`);
+         return vectorA.reduce((sum, val, i) => sum + val * vectorB[i], 0);
+    }
+
+    // Basic Gaussian elimination to solve Ax = b
+    function solveLinearSystem(matrixA, vectorB) {
+        const n = matrixA.length;
+        // Clone matrices to avoid modifying originals
+        const augmentedMatrix = matrixA.map((row, i) => [...row, vectorB[i]]);
+
+        for (let i = 0; i < n; i++) {
+            // Find pivot
+            let maxRow = i;
+            for (let k = i + 1; k < n; k++) {
+                if (Math.abs(augmentedMatrix[k][i]) > Math.abs(augmentedMatrix[maxRow][i])) {
+                    maxRow = k;
+                }
+            }
+            [augmentedMatrix[i], augmentedMatrix[maxRow]] = [augmentedMatrix[maxRow], augmentedMatrix[i]]; // Swap rows
+
+            // Check for singular matrix (or near-singular)
+            if (Math.abs(augmentedMatrix[i][i]) < 1e-8) {
+                 console.warn("Matrix might be singular or near-singular during Gaussian elimination.");
+                 return null; // Indicate failure
+            }
+
+            // Make pivot 1
+            const pivot = augmentedMatrix[i][i];
+            for (let j = i; j <= n; j++) {
+                augmentedMatrix[i][j] /= pivot;
+            }
+
+            // Eliminate other rows
+            for (let k = 0; k < n; k++) {
+                if (k !== i) {
+                    const factor = augmentedMatrix[k][i];
+                    for (let j = i; j <= n; j++) {
+                        augmentedMatrix[k][j] -= factor * augmentedMatrix[i][j];
+                    }
+                }
+            }
+        }
+
+        // Extract solution
+        const solution = Array(n);
+        for(let i = 0; i < n; i++) {
+            // Check for NaN or Infinity which indicates issues
+            if (!isFinite(augmentedMatrix[i][n])) {
+                 console.warn("Non-finite solution found during Gaussian elimination.");
+                 return null;
+            }
+            solution[i] = augmentedMatrix[i][n];
+        }
+        return solution;
+    }
+
+    function trainCalibrationModel() {
+        // Use 2nd Order Polynomial Regression
+        // screen_coord = c0 + c1*lx + c2*ly + ... + c14*ry*ry
+        // Solve X * beta = y, where beta = solve((X^T * X), (X^T * y))
+        // Number of features for 2nd order polynomial with 4 base vars (lx,ly,rx,ry) + intercept = 1 + 4 + (4*5)/2 = 15
+        const numPolyFeatures = 14; // Excluding intercept
+        const numTotalTerms = numPolyFeatures + 1;
+        const numPoints = calibrationData.length;
+        if (numPoints < numTotalTerms) { // Need more points than total terms
+             log(`❌ Not enough calibration data (${numPoints}) to train polynomial model. Need at least ${numTotalTerms}.`, "error");
+             return null;
+        }
+        log(`🧠 Training 2nd Order Polynomial calibration model using ${numPoints} data points...`, "calib");
+
+        // Construct Polynomial Design Matrix X and Target Vectors yX, yY
+        const X = calibrationData.map(d => {
+            const lx = d.features.lx, ly = d.features.ly;
+            const rx = d.features.rx, ry = d.features.ry;
+            // [1, lx, ly, rx, ry, lx*lx, lx*ly, lx*rx, lx*ry, ly*ly, ly*rx, ly*ry, rx*rx, rx*ry, ry*ry]
+            return [1, lx, ly, rx, ry, lx*lx, lx*ly, lx*rx, lx*ry, ly*ly, ly*rx, ly*ry, rx*rx, rx*ry, ry*ry];
+        });
+        const yX = calibrationData.map(d => d.screen.x);
+        const yY = calibrationData.map(d => d.screen.y);
+
+        // Calculate coefficients: beta = solve((X^T * X), (X^T * y))
+        try {
+            const Xt = transpose(X);
+            const XtX = multiply(Xt, X);
+            const XtyX = multiply(Xt, yX.map(v => [v])).map(row => row[0]); // Treat yX as column vector
+            const XtyY = multiply(Xt, yY.map(v => [v])).map(row => row[0]); // Treat yY as column vector
+
+            const coeffsX = solveLinearSystem(XtX, XtyX);
+            const coeffsY = solveLinearSystem(XtX, XtyY);
+
+            if (!coeffsX || !coeffsY) {
+                log("❌ Failed to solve for calibration coefficients (matrix likely singular or ill-conditioned).", "error");
+                return null;
+            }
+
+            if (coeffsX.length !== numTotalTerms || coeffsY.length !== numTotalTerms) {
+                 log(`❌ Incorrect number of coefficients solved (${coeffsX.length} vs expected ${numTotalTerms}).`, "error");
+                 return null;
+            }
+
+            log("📊 Calibration Coefficients (X): " + coeffsX.map(c => c.toFixed(3)).join(', '), "calib");
+            log("📊 Calibration Coefficients (Y): " + coeffsY.map(c => c.toFixed(3)).join(', '), "calib");
+
+            return { type: "polynomialRegression2", coeffsX: coeffsX, coeffsY: coeffsY }; // Mark model type
+        } catch (error) {
+            log(`❌ Error during calibration model training: ${error.message}`, "error");
+            console.error(error);
+            return null;
+        }
+    }
+
+
+    function finishCalibration() {
+        log("Calibration data collection complete.", "calib");
+        calibrationOverlay.style.display = 'none';
+        calibrationPoint.style.display = 'none';
+        gazeIndicator.style.display = 'block'; // Show gaze dot again
+
+        calibrationModel = trainCalibrationModel();
+        if (calibrationModel) {
+            isCalibrated = true;
+            log("✅ Calibration successful!", "calib");
+             // Save calibrationModel to localStorage
+             try {
+                 localStorage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify(calibrationModel));
+                 log("💾 Calibration model saved to local storage.", "calib");
+             } catch (e) {
+                 // Handle potential storage errors (e.g., quota exceeded)
+                 log("⚠️ Could not save calibration model to local storage.", "warn");
+                 console.error(e);
+             }
+        } else {
+            log("⚠️ Calibration failed or insufficient data. Using default heuristic.", "warn");
+            isCalibrated = false;
+            // Ensure any old invalid model is cleared
+            localStorage.removeItem(CALIBRATION_STORAGE_KEY);
+        }
+        appState = 'RUNNING';
+    }
+
+    // --- MediaPipe Setup ---
+    const faceMesh = new FaceMesh({locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+    }});
+
+    faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true, // Crucial for pupil and eyelid landmarks
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+
+    function onResults(results) {
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        // Don't draw the video feed by default to keep it clean
+        // canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+            const landmarks = results.multiFaceLandmarks[0];
+            const features = getEyeFeatures(landmarks);
+
+            if (features) {
+                if (appState === 'CALIBRATING') {
+                    collectCalibrationSample(features);
+                } else if (appState === 'RUNNING') {
+                    const rawGaze = calculateGazePoint(features);
+                    if (rawGaze) {
+                        // Apply smoothing
+                        smoothedGaze.x = smoothedGaze.x * (1 - DAMPING_FACTOR) + rawGaze.x * DAMPING_FACTOR;
+                        smoothedGaze.y = smoothedGaze.y * (1 - DAMPING_FACTOR) + rawGaze.y * DAMPING_FACTOR;
+
+                        // Update gaze indicator position
+                        gazeIndicator.style.left = `${smoothedGaze.x}px`;
+                        gazeIndicator.style.top = `${smoothedGaze.y}px`;
+
+                        checkDwell(smoothedGaze.x, smoothedGaze.y);
+                    }
+                    detectBlink(features); // Detect blinks regardless of gaze calculation
+                }
+            } else {
+                 // Lost tracking or landmarks missing
+                 if (dwellTarget && appState === 'RUNNING') { // Reset dwell if tracking is lost during run
+                    log(`🚫 Tracking lost, stopped dwelling on ${dwellTarget.id}`);
+                    updateProgressBar(dwellTarget, 0);
+                    dwellTarget.classList.remove('dwelling');
+                    dwellTarget = null;
+                    dwellStartTime = 0;
+                 }
+            }
+             // Optional: Draw mesh for debugging
+             // drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: '#C0C0C070', lineWidth: 1});
+             // drawLandmarks(canvasCtx, [landmarks[468], landmarks[473]], {color: '#FF0000', radius: 2}); // Pupils
+        } else {
+             // No face detected
+             if (dwellTarget && appState === 'RUNNING') { // Reset dwell if face is lost during run
+                log(`🚫 Face lost, stopped dwelling on ${dwellTarget.id}`);
+                updateProgressBar(dwellTarget, 0);
+                dwellTarget.classList.remove('dwelling');
+                dwellTarget = null;
+                dwellStartTime = 0;
+             }
+        }
+        canvasCtx.restore();
+    }
+
+    faceMesh.onResults(onResults);
+
+    // --- Camera Setup ---
+    const camera = new Camera(videoElement, {
+        onFrame: async () => {
+            if (videoElement.readyState < 3) return; // Wait for video data
+             // Ensure canvas matches video dimensions for accurate drawing
+            if (videoElement.videoWidth > 0 &&
+               (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight)) {
+                 canvasElement.width = videoElement.videoWidth;
+                 canvasElement.height = videoElement.videoHeight;
+                 log(`📐 Resized canvas to ${canvasElement.width}x${canvasElement.height}`);
+            }
+            await faceMesh.send({image: videoElement});
+        },
+        width: 640,
+        height: 360
+    });
+
+    // --- Initialization ---
+    startCalibrationBtn.onclick = startCalibration;
+
+    function initializeApp() {
+        log("🚀 Initializing Application...", "event");
+        // Load calibrationModel from localStorage if available
+        try {
+            const savedModel = localStorage.getItem(CALIBRATION_STORAGE_KEY);
+            if (savedModel) {
+                calibrationModel = JSON.parse(savedModel);
+                // Basic validation of the loaded model structure (check type and coefficient lengths)
+                const expectedLinearLength = 5;
+                const expectedPolyLength = 15;
+                let validModel = false;
+                if (calibrationModel && calibrationModel.coeffsX && calibrationModel.coeffsY) {
+                    if (calibrationModel.type === "polynomialRegression2" &&
+                        calibrationModel.coeffsX.length === expectedPolyLength &&
+                        calibrationModel.coeffsY.length === expectedPolyLength) {
+                         validModel = true;
+                    } else if (calibrationModel.type === "linearRegression" &&
+                               calibrationModel.coeffsX.length === expectedLinearLength &&
+                               calibrationModel.coeffsY.length === expectedLinearLength) {
+                         validModel = true; // Allow loading old linear model
+                         log("ℹ️ Loaded older linear calibration model.", "calib");
+                    }
+                }
+
+                if (validModel) {
+                    isCalibrated = true;
+                    log("✅ Loaded previous calibration data from local storage.", "calib");
+                } else {
+                     // Clear invalid data
+                     log("⚠️ Invalid or incompatible calibration data found in local storage. Needs recalibration.", "warn");
+                     isCalibrated = false; calibrationModel = null; localStorage.removeItem(CALIBRATION_STORAGE_KEY);
+                }
+            }
+        } catch (e) {
+             // Handle potential parsing errors
+             log("⚠️ Could not load calibration model from local storage.", "warn");
+             console.error(e);
+             isCalibrated = false; calibrationModel = null;
+        }
+
+        if (!isCalibrated) {
+            log("⚠️ No valid calibration data found. Calibration recommended.", "warn");
+        }
+
+        // Start camera and MediaPipe
+        camera.start()
+            .then(() => {
+                log("🎥 MediaPipe Initialized & Camera Started", "event");
+                // Always go to running state, using heuristic if not calibrated
+                appState = 'RUNNING';
+                gazeIndicator.style.display = 'block';
+            })
+            .catch(err => {
+                log(`❌ Error starting camera: ${err}`, "error");
+                appState = 'ERROR';
+            });
+    }
+
+    initializeApp(); // Start the application
+
+</script>
+</body>
+</html>

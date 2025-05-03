@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!-- PRF‑CALIB-2025‑04‑30‑FALLBACK-FIX-GAZE -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Supagrok Gaze Tracker</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: black; color: white;
+      overflow: hidden;
+      font-family: monospace;
+      height: 100%; width: 100%;
+    }
+    canvas#overlay {
+      position: fixed; top: 0; left: 0; z-index: 1000; pointer-events: none;
+    }
+    #statusLog {
+      position: fixed; left: 0; bottom: 0; z-index: 9999;
+      font-size: 16px;
+      color: lime;
+      background: black;
+      padding: 5px;
+    }
+    .calib-dot {
+      width: 20px; height: 20px;
+      background: red;
+      border-radius: 50%;
+      position: absolute;
+      z-index: 2000;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<canvas id="overlay" width="640" height="480"></canvas>
+<div id="modal" style="display: none;"></div>
+<div id="statusLog"></div>
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script>
+const statusLog = document.getElementById('statusLog');
+function log(msg) {
+  const now = new Date().toLocaleTimeString();
+  const d = document.createElement("div");
+  d.textContent = `[${now}] ` + msg;
+  statusLog.appendChild(d);
+}
+
+log("⏳ Waiting for events...");
+
+document.addEventListener("DOMContentLoaded", () => {
+  const canvas = document.getElementById("overlay");
+  const ctx = canvas.getContext("2d");
+  const trail = [];
+  let smoothed = { x: 0, y: 0 };
+  let currentDot = 0;
+
+  const dots = [[0.1,0.1],[0.9,0.1],[0.5,0.5],[0.1,0.9],[0.9,0.9]];
+  const dotElement = document.createElement("div");
+  dotElement.className = "calib-dot";
+  document.body.appendChild(dotElement);
+
+  function placeDot(xr, yr) {
+    dotElement.style.left = `${window.innerWidth * xr - 10}px`;
+    dotElement.style.top = `${window.innerHeight * yr - 10}px`;
+    dotElement.onclick = async () => {
+      try {
+        const pred = await webgazer.getCurrentPrediction();
+        log("📍 Calibration dot clicked.");
+        if (pred) {
+          log("📊 Prediction captured.");
+        }
+      } catch {
+        log("⚠️ Prediction failed.");
+      }
+      currentDot++;
+      if (currentDot < dots.length) {
+        placeDot(...dots[currentDot]);
+      } else {
+        dotElement.remove();
+        log("✅ Calibration closed.");
+      }
+    };
+  }
+
+  webgazer.setRegression("ridge");
+  webgazer.setGazeListener(data => {
+    if (!data) return;
+    smoothed.x = 0.85 * smoothed.x + 0.15 * data.x;
+    smoothed.y = 0.85 * smoothed.y + 0.15 * data.y;
+    trail.push({ x: smoothed.x, y: smoothed.y, t: Date.now() });
+  });
+
+  function drawTrail() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const now = Date.now();
+    for (const p of trail.filter(pt => now - pt.t < 3000)) {
+      const a = 1 - (now - pt.t) / 3000;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = `rgba(0,255,0,${a})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(drawTrail);
+  }
+
+  webgazer.begin().then(() => {
+    log("🧠 WebGazer initialized");
+    placeDot(...dots[currentDot]);
+    drawTrail();
+  }).catch(() => log("❌ WebGazer failed to initialize"));
+});
+</script>
+</body>
+</html>

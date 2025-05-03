@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Supagrok Gaze Calibration v2</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: black;
+      color: white;
+      font-family: sans-serif;
+      overflow: hidden;
+      height: 100%; width: 100%;
+    }
+    canvas#overlay {
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .calib-dot {
+      width: 20px;
+      height: 20px;
+      background: red;
+      border-radius: 50%;
+      position: absolute;
+      z-index: 2000;
+      cursor: pointer;
+    }
+    #main {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1500;
+    }
+    #debug {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      font-size: 12px;
+      background: rgba(0,0,0,0.7);
+      padding: 5px;
+      z-index: 2500;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="overlay"></canvas>
+  <div id="main">
+    <h1>Supagrok BootShield</h1>
+    <button onclick="fetch('/launchers/launch_nobara.sh')">Launch OS</button>
+  </div>
+  <div id="debug">Initializing WebGazer...</div>
+
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+  <script>
+    const canvas = document.getElementById('overlay');
+    const ctx = canvas.getContext('2d');
+    const debug = document.getElementById('debug');
+    let log = [], trail = [], filtered = [], lastGaze = null;
+    const avgWindow = 5;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    const calibrationPoints = [
+      [0.1, 0.1], [0.5, 0.1], [0.9, 0.1],
+      [0.1, 0.5], [0.5, 0.5], [0.9, 0.5],
+      [0.1, 0.9], [0.5, 0.9], [0.9, 0.9]
+    ];
+    let currentDot = 0;
+
+    function placeCalibrationDot([xRatio, yRatio]) {
+      const dot = document.createElement('div');
+      dot.className = 'calib-dot';
+      dot.style.left = `${window.innerWidth * xRatio - 10}px`;
+      dot.style.top = `${window.innerHeight * yRatio - 10}px`;
+      dot.onclick = () => {
+        const tx = dot.offsetLeft + 10;
+        const ty = dot.offsetTop + 10;
+        if (lastGaze) {
+          const dx = lastGaze.x - tx, dy = lastGaze.y - ty;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          log.push({ timestamp: Date.now(), tx, ty, gx: lastGaze.x, gy: lastGaze.y, dist });
+          debug.innerText = `Distance to dot: ${Math.round(dist)}px`;
+        }
+        webgazer.recordScreenPosition(tx, ty, 'click');
+        dot.remove();
+        currentDot++;
+        if (currentDot < calibrationPoints.length) {
+          placeCalibrationDot(calibrationPoints[currentDot]);
+        } else {
+          finishCalibration();
+        }
+      };
+      document.body.appendChild(dot);
+    }
+
+    function finishCalibration() {
+      debug.innerText = "✅ Calibration complete. Press [E] to export log, [R] to restart.";
+      document.getElementById('main').style.display = 'block';
+    }
+
+    function smoothGaze(gx, gy) {
+      filtered.push({x: gx, y: gy});
+      if (filtered.length > avgWindow) filtered.shift();
+      const avgX = filtered.reduce((sum, p) => sum + p.x, 0) / filtered.length;
+      const avgY = filtered.reduce((sum, p) => sum + p.y, 0) / filtered.length;
+      return { x: avgX, y: avgY };
+    }
+
+    webgazer.setRegression('ridge');
+    webgazer.setGazeListener((data) => {
+      if (!data) return;
+      lastGaze = smoothGaze(data.x, data.y);
+      const now = Date.now();
+      trail.push({ ...lastGaze, t: now });
+      trail = trail.filter(p => now - p.t < 3000);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const p of trail) {
+        const age = now - p.t;
+        const alpha = 1 - (age / 3000);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = `rgba(0,255,0,${alpha})`;
+        ctx.fill();
+      }
+    });
+
+    webgazer.begin()
+      .then(() => {
+        debug.innerText = "🟢 WebGazer loaded — Click calibration dots.";
+        placeCalibrationDot(calibrationPoints[currentDot]);
+      });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'e') {
+        const blob = new Blob([JSON.stringify(log, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `gaze_log_${Date.now()}.json`;
+        a.click();
+      }
+      if (e.key === 'c') {
+        trail = [];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        debug.innerText = "🧼 Cleared trail.";
+      }
+      if (e.key === 'r') {
+        currentDot = 0;
+        log = [];
+        document.querySelectorAll('.calib-dot').forEach(dot => dot.remove());
+        placeCalibrationDot(calibrationPoints[currentDot]);
+        debug.innerText = "🔁 Restarted calibration.";
+      }
+    });
+  </script>
+</body>
+</html>

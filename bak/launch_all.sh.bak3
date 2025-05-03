@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# launch_all.sh — PRF‑COMPOSITE‑2025‑04‑30‑J2 (Gaze Tracker Launcher + Redundant CV Tracking)
+# Purpose: Launch WebSocket, WebGazer, fallback OpenCV gaze capture, HTTP server, and browser in one-shot
+# UUID: 6810e201-4d88-8008-b97b-e72dfdca3250
+# Timestamp: 2025-04-30T10:00:00-04:00
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+# === CONFIG ===
+LOG=prf_runlog.txt
+PORT=8000
+BROWSER="firefox"
+HTTP_SERVER_PID=""
+WS_SERVER_PID=""
+LOGGER_PID=""
+FALLBACK_PID=""
+
+function cleanup {
+  echo "🧼 Cleaning up all processes..." | tee -a "$LOG"
+  [[ -n "$HTTP_SERVER_PID" ]] && kill "$HTTP_SERVER_PID" 2>/dev/null || true
+  [[ -n "$WS_SERVER_PID" ]] && kill "$WS_SERVER_PID" 2>/dev/null || true
+  [[ -n "$LOGGER_PID" ]] && kill "$LOGGER_PID" 2>/dev/null || true
+  [[ -n "$FALLBACK_PID" ]] && kill "$FALLBACK_PID" 2>/dev/null || true
+}
+
+trap cleanup EXIT
+
+# === PRECHECK: Ensure no stale WS server ===
+if lsof -i :8765 &>/dev/null; then
+  echo "⚠ WebSocket port 8765 in use — attempting cleanup..." | tee -a "$LOG"
+  fuser -k 8765/tcp || true
+  sleep 1
+fi
+
+# === PHASE 1: WebSocket Server ===
+echo "🌐 Launching WebSocket server..." | tee "$LOG"
+python3 gaze_ws_server.py &
+WS_SERVER_PID=$!
+sleep 1
+
+# === PHASE 2: Fallback OpenCV Face Tracker ===
+echo "🧠 Launching OpenCV face+eye fallback..." | tee -a "$LOG"
+python3 codex/fallback_face_eye_tracker.py &
+FALLBACK_PID=$!
+sleep 1
+
+# === PHASE 3: WebGazer + Overlay Logger ===
+echo "🎯 Launching overlay gaze logger..." | tee -a "$LOG"
+python3 overlay_gaze_logger.py &
+LOGGER_PID=$!
+sleep 1
+
+# === PHASE 4: Serve Browser HTML ===
+echo "📡 Serving index.html on port $PORT..." | tee -a "$LOG"
+python3 -m http.server "$PORT" &
+HTTP_SERVER_PID=$!
+sleep 1
+
+# === PHASE 5: Open Browser Tab ===
+echo "🚀 Opening browser to localhost..." | tee -a "$LOG"
+"$BROWSER" "http://localhost:$PORT/index.html" &
+sleep 2
+
+# === PHASE 6: Status Check ===
+echo "📋 Checking log for expected process launches..." | tee -a "$LOG"
+grep -E 'WebSocket|Overlay|HTTP|fallback' "$LOG" || echo "⚠ Launch log incomplete."
+
+# === FINAL STATE ===
+echo "🟢 Tracker running — press Ctrl+C to stop." | tee -a "$LOG"
+wait $LOGGER_PID

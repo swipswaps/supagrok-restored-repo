@@ -1,0 +1,28 @@
+{
+  "assertions": [
+    {
+      "PRF ID": "PRF‑P01",
+      "Assertion Description": "All snapshot files must contain metadata: _file and _comment keys for forensic traceability.",
+      "Code or Verbatim Line Snippet": "\"_file\": \"/mnt/data/supagrok_repo_snapshot_2025_04_29_COMPLETE_FINAL_REPO.json\"",
+      "Block Location": "Snapshot Header",
+      "Met": "✓",
+      "Explanation or Expanded Code Comments": "This ensures reproducibility and origin clarity for audit bundles."
+    },
+    {
+      "PRF ID": "PRF‑P02",
+      "Assertion Description": "All output must be human-readable and terminal-visible without requiring external file downloads.",
+      "Code or Verbatim Line Snippet": "cat supagrok_repo_snapshot_2025_04_29_COMPLETE_FINAL_REPO.json",
+      "Block Location": "Validator CLI",
+      "Met": "✓",
+      "Explanation or Expanded Code Comments": "Ensures audit bundles are verifiable without needing a browser or GUI."
+    },
+    {
+      "PRF ID": "PRF‑P07a",
+      "Assertion Description": "No shorthand or environment variable path references are permitted (`$HOME`, `~`, `...`).",
+      "Code or Verbatim Line Snippet": "JSON_FILE=\"/mnt/data/supagrok_repo_snapshot_2025_04_29_CORRECTED_COMPLETE.json\"",
+      "Block Location": "unpack_supagrok_bundle.sh",
+      "Met": "✓",
+      "Explanation or Expanded Code Comments": "Prevents unpredictable expansion or shell substitution failures."
+    }
+  ]
+}

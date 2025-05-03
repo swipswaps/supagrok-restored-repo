@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Button Demo</title>
+    <style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .panel {
+            position: relative;
+            width: 340px;
+            height: 300px;
+        }
+        
+        .button {
+            position: absolute;
+            cursor: pointer;
+        }
+        
+        .exit-button {
+            top: 10px;
+            left: 10px;
+        }
+        
+        .mode1-button {
+            top: 50px;
+            left: 20px;
+        }
+        
+        .mode2-button {
+            top: 120px;
+            left: 20px;
+        }
+        
+        .mode3-button {
+            top: 190px;
+            left: 20px;
+        }
+        
+        .progress {
+            transition: width 0.1s linear;
+        }
+        
+        .gaze-indicator {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid #00ff00;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+        
+        .gaze-indicator::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #00ff00;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <div class="button exit-button" id="exitButton">
+        <object data="exit_button.svg" type="image/svg+xml" width="120" height="50"></object>
+    </div>
+    
+    <div class="panel">
+        <object data="panel.svg" type="image/svg+xml" width="340" height="300"></object>
+        
+        <div class="button mode1-button" id="mode1Button">
+            <object data="mode1_button.svg" type="image/svg+xml" width="300" height="50"></object>
+        </div>
+        
+        <div class="button mode2-button" id="mode2Button">
+            <object data="mode2_button.svg" type="image/svg+xml" width="300" height="50"></object>
+        </div>
+        
+        <div class="button mode3-button" id="mode3Button">
+            <object data="mode3_button.svg" type="image/svg+xml" width="300" height="50"></object>
+        </div>
+    </div>
+    
+    <div class="gaze-indicator" id="gazeIndicator"></div>
+    
+    <script>
+        // Wait for SVG objects to load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get SVG documents
+            const exitButton = document.querySelector('.exit-button object');
+            const mode1Button = document.querySelector('.mode1-button object');
+            const mode2Button = document.querySelector('.mode2-button object');
+            const mode3Button = document.querySelector('.mode3-button object');
+            
+            // Wait for SVG documents to load
+            exitButton.addEventListener('load', function() {
+                initButton(exitButton, 'exit');
+            });
+            
+            mode1Button.addEventListener('load', function() {
+                initButton(mode1Button, 'mode1');
+            });
+            
+            mode2Button.addEventListener('load', function() {
+                initButton(mode2Button, 'mode2');
+            });
+            
+            mode3Button.addEventListener('load', function() {
+                initButton(mode3Button, 'mode3');
+            });
+            
+            // Initialize gaze tracking
+            initGazeTracking();
+        });
+        
+        // Button states
+        const buttonStates = {
+            'exit': { hover: false, dwellTime: 0 },
+            'mode1': { hover: false, dwellTime: 0 },
+            'mode2': { hover: false, dwellTime: 0 },
+            'mode3': { hover: false, dwellTime: 0 }
+        };
+        
+        // Button references
+        const buttons = {};
+        
+        // Initialize button
+        function initButton(buttonObj, name) {
+            const svgDoc = buttonObj.contentDocument;
+            const progressBar = svgDoc.querySelector('.progress');
+            
+            buttons[name] = {
+                element: buttonObj,
+                progress: progressBar
+            };
+        }
+        
+        // Initialize gaze tracking
+        function initGazeTracking() {
+            const gazeIndicator = document.getElementById('gazeIndicator');
+            let mouseX = 0;
+            let mouseY = 0;
+            let lastTime = Date.now();
+            const dwellThreshold = 1000; // 1 second
+            
+            // Use mouse position as simulated gaze
+            document.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                
+                // Update gaze indicator position
+                gazeIndicator.style.left = mouseX + 'px';
+                gazeIndicator.style.top = mouseY + 'px';
+            });
+            
+            // Main update loop
+            function update() {
+                const currentTime = Date.now();
+                const dt = currentTime - lastTime;
+                lastTime = currentTime;
+                
+                // Check if all buttons are loaded
+                if (Object.keys(buttons).length < 4) {
+                    requestAnimationFrame(update);
+                    return;
+                }
+                
+                // Check if gaze is on a button
+                let isHovering = false;
+                
+                for (const [name, button] of Object.entries(buttons)) {
+                    const rect = button.element.getBoundingClientRect();
+                    
+                    // Add margin for easier selection
+                    const margin = 20;
+                    if (mouseX >= rect.left - margin && 
+                        mouseX <= rect.right + margin && 
+                        mouseY >= rect.top - margin && 
+                        mouseY <= rect.bottom + margin) {
+                        
+                        isHovering = true;
+                        
+                        // If we just started hovering over this button
+                        if (!buttonStates[name].hover) {
+                            buttonStates[name].hover = true;
+                            buttonStates[name].dwellTime = 0;
+                        } else {
+                            // Continue dwelling on the same button
+                            buttonStates[name].dwellTime += dt;
+                            
+                            // Calculate progress
+                            const progress = Math.min(100, (buttonStates[name].dwellTime / dwellThreshold) * 100);
+                            const progressWidth = (progress / 100) * parseInt(button.progress.getAttribute('width').baseVal.value);
+                            
+                            // Update progress bar
+                            button.progress.setAttribute('width', progressWidth);
+                            
+                            // Check if dwell is complete
+                            if (buttonStates[name].dwellTime >= dwellThreshold) {
+                                // Button activated
+                                if (name === 'exit') {
+                                    alert('EXIT button activated');
+                                } else {
+                                    alert(name + ' button selected');
+                                }
+                                
+                                // Reset dwell
+                                buttonStates[name].dwellTime = 0;
+                                button.progress.setAttribute('width', '0');
+                            }
+                        }
+                        
+                        break;
+                    } else {
+                        // Not hovering over this button
+                        buttonStates[name].hover = false;
+                        buttonStates[name].dwellTime = 0;
+                        button.progress.setAttribute('width', '0');
+                    }
+                }
+                
+                // If not hovering over any button
+                if (!isHovering) {
+                    for (const [name, state] of Object.entries(buttonStates)) {
+                        state.hover = false;
+                        state.dwellTime = 0;
+                        buttons[name].progress.setAttribute('width', '0');
+                    }
+                }
+                
+                requestAnimationFrame(update);
+            }
+            
+            // Start the update loop
+            update();
+        }
+    </script>
+</body>
+</html>

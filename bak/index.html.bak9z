@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Supagrok Gaze Tracker</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; width: 100%; background: black; color: lime; font-family: monospace; overflow: hidden; }
+    canvas#overlay { position: fixed; top: 0; left: 0; z-index: 1000; pointer-events: none; }
+    #statusLogs { position: fixed; bottom: 0; left: 0; right: 0; background: black; color: lime; font-size: 14px; padding: 4px; max-height: 22vh; overflow-y: auto; z-index: 2000; }
+    .calib-dot { width: 20px; height: 20px; background: red; border-radius: 50%; position: absolute; z-index: 1500; cursor: pointer; }
+    .mode-btn { padding: 8px 20px; margin: 10px; font-size: 20px; border: 2px solid #ccc; background: #222; color: white; border-radius: 5px; cursor: pointer; }
+    .mode-btn:hover, .mode-btn.focused { border-color: lime; background: #444; }
+    #calibModal { position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: black; border: 3px solid lime; padding: 20px; z-index: 3000; display: none; text-align: center; }
+  </style>
+</head>
+<body>
+<canvas id="overlay"></canvas>
+<div id="statusLogs">[🕓] Waiting for events...</div>
+
+<div id="calibModal">
+  <h2>Calibration Options</h2>
+  <div><button class="mode-btn" data-mode="haar">Mode 1 (Haar Eye)</button></div>
+  <div><button class="mode-btn" data-mode="dnn">Mode 2 (DNN Face)</button></div>
+  <div><button class="mode-btn" data-mode="mesh">Mode 3 (Facial Mesh)</button></div>
+  <div><button id="closeBtn" class="mode-btn">Close</button></div>
+</div>
+
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script>
+(async function() {
+  const logBox = document.getElementById("statusLogs");
+  const canvas = document.getElementById("overlay");
+  const ctx = canvas.getContext("2d");
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const smooth = { x: 0, y: 0 };
+  const trail = [];
+
+  function log(msg) {
+    const ts = new Date().toLocaleTimeString();
+    logBox.innerHTML += `<div>[${ts}] ${msg}</div>`;
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const now = Date.now();
+    for (const p of trail.filter(p => now - p.t < 3000)) {
+      const a = 1 - (now - p.t) / 3000;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = `rgba(0,255,0,${a})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+
+  function updateGaze(data) {
+    if (!data) return;
+    smooth.x = 0.85 * smooth.x + 0.15 * data.x;
+    smooth.y = 0.85 * smooth.y + 0.15 * data.y;
+    trail.push({ x: smooth.x, y: smooth.y, t: Date.now() });
+
+    const hover = document.elementFromPoint(smooth.x, smooth.y);
+    document.querySelectorAll(".mode-btn").forEach(btn => btn.classList.remove("focused"));
+    if (hover && hover.classList.contains("mode-btn")) {
+      hover.classList.add("focused");
+    }
+  }
+
+  function setupCalibrationWindow() {
+    const modal = document.getElementById("calibModal");
+    modal.style.display = "block";
+
+    document.querySelectorAll(".mode-btn").forEach(btn => {
+      btn.onclick = () => {
+        const mode = btn.dataset.mode || "none";
+        log(`🧠 Switched to ${mode}`);
+        modal.style.display = "none";
+        log("✅ Calibration closed.");
+      };
+    });
+
+    document.getElementById("closeBtn").onclick = () => {
+      modal.style.display = "none";
+      log("✅ Calibration closed.");
+    };
+  }
+
+  log("🧠 Initializing WebGazer...");
+  try {
+    await webgazer.setGazeListener(updateGaze).begin();
+    log("✅ WebGazer initialized.");
+  } catch (e) {
+    log("❌ WebGazer failed to initialize.");
+    return;
+  }
+
+  setupCalibrationWindow();
+  draw();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Supagrok Gaze Overlay</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: black; color: white;
+      overflow: hidden; height: 100%; width: 100%;
+      font-family: monospace;
+    }
+    canvas#overlay {
+      position: fixed; top: 0; left: 0;
+      z-index: 999; pointer-events: none;
+    }
+    .calib-dot {
+      width: 20px; height: 20px;
+      background: red; border-radius: 50%;
+      position: absolute; z-index: 2000;
+    }
+    #statusLog {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.85);
+      color: lime; font-size: 13px;
+      max-height: 25vh; overflow-y: auto;
+      z-index: 3000; padding: 6px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="overlay"></canvas>
+  <div id="statusLog">🟢 Initialized overlay environment...</div>
+
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+  <script>
+    const overlay = document.getElementById('overlay');
+    const ctx = overlay.getContext('2d');
+    const logTrail = [], statusLog = document.getElementById('statusLog');
+    let ws = null, smoothed = { x: 0, y: 0 };
+
+    function resize() {
+      overlay.width = window.innerWidth;
+      overlay.height = window.innerHeight;
+    }
+
+    function logStatus(msg) {
+      console.log(msg);
+      const line = document.createElement("div");
+      line.textContent = msg;
+      statusLog.appendChild(line);
+      statusLog.scrollTop = statusLog.scrollHeight;
+    }
+
+    function drawTrail() {
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+      const now = Date.now();
+      for (const p of logTrail.filter(e => now - e.t < 3000)) {
+        const a = 1 - (now - p.t) / 3000;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = `rgba(0,255,0,${a})`;
+        ctx.fill();
+      }
+    }
+
+    function sendGaze(data) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(data));
+      }
+    }
+
+    function simulatePointer(x, y, click=false) {
+      const evt = new MouseEvent(click ? 'click' : 'mousemove', {
+        bubbles: true, clientX: x, clientY: y, view: window
+      });
+      document.elementFromPoint(x, y)?.dispatchEvent(evt);
+    }
+
+    async function initGazer() {
+      webgazer.setRegression('ridge');
+      webgazer.setGazeListener(data => {
+        if (!data) return;
+        const x = data.x, y = data.y;
+        smoothed.x = 0.8 * smoothed.x + 0.2 * x;
+        smoothed.y = 0.8 * smoothed.y + 0.2 * y;
+        logTrail.push({ x: smoothed.x, y: smoothed.y, t: Date.now() });
+        sendGaze(data);
+        drawTrail();
+        simulatePointer(smoothed.x, smoothed.y);
+      });
+      try {
+        await webgazer.begin();
+        logStatus("🧠 WebGazer loaded.");
+      } catch (err) {
+        logStatus("❌ WebGazer error: " + err);
+      }
+    }
+
+    function initSocket() {
+      try {
+        ws = new WebSocket("ws://localhost:8765");
+        ws.onopen = () => logStatus("🔌 WebSocket connected.");
+        ws.onerror = e => logStatus("❌ WS error: " + e.message);
+      } catch (e) {
+        logStatus("❌ WebSocket init failed.");
+      }
+    }
+
+    window.addEventListener("resize", resize);
+    document.addEventListener("DOMContentLoaded", () => {
+      resize();
+      initSocket();
+      initGazer();
+    });
+  </script>
+</body>
+</html>

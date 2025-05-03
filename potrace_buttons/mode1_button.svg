@@ -1,0 +1,24 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg
+  xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="50" version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="300.000000pt" height="50.000000pt" viewBox="0 0 300.000000 50.000000"
+ preserveAspectRatio="xMidYMid meet">
+<metadata>
+Created by potrace 1.16, written by Peter Selinger 2001-2019
+</metadata>
+<g transform="translate(0.000000,50.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none">
+<path d="M2790 483 c-30 -7 -56 -18 -58 -23 -2 -6 -9 -10 -15 -10 -16 0 -69
+-57 -95 -102 -27 -48 -61 -159 -67 -220 -3 -26 -5 -51 -6 -55 -1 -4 -1 -23 0
+-40 1 -25 6 -33 19 -33 16 0 20 14 30 103 20 180 74 286 166 328 45 21 149 25
+204 10 32 -10 33 -9 30 16 -3 27 -4 27 -118 37 -19 2 -60 -3 -90 -11z"/>
+<path d="M2798 311 c-51 -45 -78 -116 -85 -222 -6 -86 -5 -89 16 -89 15 0 21
+7 22 23 1 12 2 49 4 82 5 122 59 199 134 188 20 -3 44 -5 53 -5 10 0 20 -3 23
+-9 11 -17 35 -9 35 11 0 25 -32 38 -110 47 -53 5 -59 4 -92 -26z"/>
+</g>
+<rect x="0" y="0" width="300" height="50" fill="#042430" stroke="#072f3b" stroke-width="1" />
+<text x="150.0" y="25.0" font-family="Arial, sans-serif" font-size="16" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">Mode 1 (Haar Eye)</text>
+<rect class="progress" x="0" y="46" width="0" height="4" fill="#3b82f6" />
+</svg>

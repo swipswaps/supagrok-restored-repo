@@ -1,0 +1,6 @@
+<?xml version="1.0" ?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="50" viewBox="0 0 300 50">
+  <rect x="0" y="0" width="300" height="50" rx="0" ry="0" fill="#062b38" stroke="#062935" stroke-width="1"/>
+  <text x="150" y="25" font-family="Arial, sans-serif" font-size="16" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">Mode 1 (Haar Eye)</text>
+  <rect x="0" y="46" width="0" height="4" fill="#3b82f6" class="progress"/>
+</svg>

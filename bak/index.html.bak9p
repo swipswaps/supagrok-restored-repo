@@ -1,0 +1,140 @@
+<!-- PRF‑CALIB‑2025‑04‑30‑ROLLBACK‑TRAIL‑OVERLAY‑FIX‑A -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Supagrok Gaze Overlay</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; background: black; color: white;
+      overflow: hidden; font-family: sans-serif; height: 100%; width: 100%;
+    }
+    canvas#overlay {
+      position: fixed; top: 0; left: 0; z-index: 1000; pointer-events: none;
+    }
+    .calib-dot {
+      width: 20px; height: 20px; background: red; border-radius: 50%;
+      position: absolute; z-index: 2000; cursor: pointer;
+    }
+    #statusLog {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(0, 0, 0, 0.9); color: lime; font: 14px monospace;
+      padding: 6px; max-height: 25vh; overflow-y: auto; z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+<canvas id="overlay"></canvas>
+<div id="statusLog"></div>
+
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const canvas = document.getElementById("overlay");
+  const ctx = canvas.getContext("2d");
+  const logDiv = document.getElementById("statusLog");
+  const calibrationPoints = [
+    [0.1, 0.1], [0.9, 0.1], [0.5, 0.5], [0.1, 0.9], [0.9, 0.9]
+  ];
+  const trail = [];
+  let smoothed = { x: 0, y: 0 };
+  let currentDot = 0;
+  let ws = null;
+
+  function logStatus(msg, icon = "🧠") {
+    const d = document.createElement("div");
+    d.textContent = `${icon} ${msg}`;
+    logDiv.appendChild(d);
+    logDiv.scrollTop = logDiv.scrollHeight;
+    console.log(msg);
+  }
+
+  function drawTrail() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const now = Date.now();
+    for (const p of trail.filter(p => now - p.t < 3000)) {
+      const alpha = 1 - (now - p.t) / 3000;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = `rgba(0,255,0,${alpha})`;
+      ctx.fill();
+    }
+  }
+
+  function sendToSocket(data) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(data));
+    }
+  }
+
+  function placeCalibrationDot([xr, yr]) {
+    const dot = document.createElement("div");
+    dot.className = "calib-dot";
+    dot.style.left = `${window.innerWidth * xr - 10}px`;
+    dot.style.top = `${window.innerHeight * yr - 10}px`;
+    dot.onclick = async () => {
+      const tx = dot.offsetLeft + 10;
+      const ty = dot.offsetTop + 10;
+      const pred = await webgazer.getCurrentPrediction();
+      if (pred) {
+        sendToSocket(pred);
+        logStatus(`📍 Calibrated: Δx=${Math.round(pred.x - tx)}, Δy=${Math.round(pred.y - ty)}`);
+      } else {
+        logStatus("⚠ No prediction available.");
+      }
+      dot.remove();
+      currentDot++;
+      if (currentDot < calibrationPoints.length) {
+        placeCalibrationDot(calibrationPoints[currentDot]);
+      } else {
+        logStatus("✅ Calibration complete. Press ESC to exit.");
+      }
+    };
+    document.body.appendChild(dot);
+  }
+
+  window.addEventListener("resize", () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  });
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  // Close calibration with ESC
+  window.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      document.querySelectorAll(".calib-dot").forEach(d => d.remove());
+      logStatus("🛑 Calibration window closed.", "❌");
+    }
+  });
+
+  try {
+    ws = new WebSocket("ws://localhost:8765");
+    ws.onopen = () => logStatus("WS connected.", "🟢");
+    ws.onerror = e => logStatus(`WS error: ${e.message}`, "❌");
+  } catch (e) {
+    logStatus(`WebSocket init error: ${e.message}`, "❌");
+  }
+
+  try {
+    webgazer.setRegression("ridge");
+    webgazer.setGazeListener(data => {
+      if (!data) return;
+      smoothed.x = 0.8 * smoothed.x + 0.2 * data.x;
+      smoothed.y = 0.8 * smoothed.y + 0.2 * data.y;
+      trail.push({ x: smoothed.x, y: smoothed.y, t: Date.now() });
+      drawTrail();
+    });
+    webgazer.begin().then(() => {
+      logStatus("WebGazer loaded.", "🧠");
+      placeCalibrationDot(calibrationPoints[currentDot]);
+    });
+  } catch (e) {
+    logStatus(`WebGazer error: ${e.message}`, "❌");
+  }
+
+  logStatus("Initialized overlay environment...", "🟢");
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,250 @@
+{
+  "metadata": {
+    "directive": "PRF-SUPAGROK-CODEX-2025-05-02-A",
+    "purpose": "Policy Rule Framework Codex for Supagrok Repository",
+    "status": "COMPLIANT",
+    "version": "1.0.0",
+    "timestamp": "2025-05-02T12:00:00Z",
+    "author": "swipswaps"
+  },
+  "rules": [
+    {
+      "id": "P01",
+      "name": "Metadata and UUID Generation",
+      "description": "All scripts must include metadata with timestamp and UUID generation for traceability",
+      "required": true,
+      "validation": "Each script must include TS and UUID variables at the top of the file"
+    },
+    {
+      "id": "P02",
+      "name": "Log Utility",
+      "description": "All scripts must include a log utility function for consistent logging",
+      "required": true,
+      "validation": "Each script must include a log() function that writes to both console and file"
+    },
+    {
+      "id": "P03",
+      "name": "Error Handling",
+      "description": "All scripts must include proper error handling with try-except blocks",
+      "required": true,
+      "validation": "Each script must wrap main functionality in try-except blocks and log errors"
+    },
+    {
+      "id": "P04",
+      "name": "Configuration Management",
+      "description": "Scripts that use configuration must include functions to load and save configuration",
+      "required": true,
+      "validation": "Scripts with configuration must include load_config() and save_config() functions"
+    },
+    {
+      "id": "P05",
+      "name": "Command Line Interface",
+      "description": "Scripts that can be run from command line must include argument parsing",
+      "required": true,
+      "validation": "Scripts must include parse_args() function using argparse"
+    },
+    {
+      "id": "P06",
+      "name": "Backup Creation",
+      "description": "Scripts that modify system files must create backups before making changes",
+      "required": true,
+      "validation": "Scripts must create backup files with timestamp suffix before modifying files"
+    },
+    {
+      "id": "P07",
+      "name": "Verification",
+      "description": "Scripts must verify the results of operations",
+      "required": true,
+      "validation": "Scripts must include verification functions that check if operations succeeded"
+    },
+    {
+      "id": "P08",
+      "name": "Documentation",
+      "description": "All scripts must include comprehensive documentation",
+      "required": true,
+      "validation": "Scripts must include docstrings for all functions and classes"
+    },
+    {
+      "id": "P09",
+      "name": "PRF Compliance Table",
+      "description": "All scripts must include a PRF compliance table",
+      "required": true,
+      "validation": "Scripts must include a PRF compliance table at the end of the file"
+    },
+    {
+      "id": "P10",
+      "name": "Thread Safety",
+      "description": "Scripts that use threading must ensure thread safety",
+      "required": true,
+      "validation": "Scripts must use proper synchronization mechanisms for shared resources"
+    },
+    {
+      "id": "P11",
+      "name": "Resource Cleanup",
+      "description": "Scripts must clean up resources properly",
+      "required": true,
+      "validation": "Scripts must close files, connections, and other resources in finally blocks"
+    },
+    {
+      "id": "P12",
+      "name": "Permissions Management",
+      "description": "Scripts that require elevated permissions must check and handle permissions properly",
+      "required": true,
+      "validation": "Scripts must check if they have the necessary permissions and handle accordingly"
+    },
+    {
+      "id": "P13",
+      "name": "Path Validation",
+      "description": "Scripts that work with file paths must validate paths",
+      "required": true,
+      "validation": "Scripts must check if paths exist and are accessible before using them"
+    },
+    {
+      "id": "P14",
+      "name": "Input Validation",
+      "description": "Scripts must validate all input",
+      "required": true,
+      "validation": "Scripts must check if input is valid before using it"
+    },
+    {
+      "id": "P15",
+      "name": "Output Formatting",
+      "description": "Scripts must format output consistently",
+      "required": true,
+      "validation": "Scripts must use consistent formatting for output"
+    },
+    {
+      "id": "P16",
+      "name": "Version Compatibility",
+      "description": "Scripts must be compatible with specified Python versions",
+      "required": true,
+      "validation": "Scripts must work with Python 3.6 and higher"
+    },
+    {
+      "id": "P17",
+      "name": "Dependency Management",
+      "description": "Scripts must handle dependencies properly",
+      "required": true,
+      "validation": "Scripts must check if required dependencies are installed"
+    },
+    {
+      "id": "P18",
+      "name": "Performance Optimization",
+      "description": "Scripts must be optimized for performance",
+      "required": true,
+      "validation": "Scripts must use efficient algorithms and data structures"
+    },
+    {
+      "id": "P19",
+      "name": "Security Considerations",
+      "description": "Scripts must handle security considerations properly",
+      "required": true,
+      "validation": "Scripts must use secure coding practices"
+    },
+    {
+      "id": "P20",
+      "name": "Internationalization",
+      "description": "Scripts must support internationalization",
+      "required": false,
+      "validation": "Scripts should use techniques that support multiple languages"
+    },
+    {
+      "id": "P21",
+      "name": "Accessibility",
+      "description": "Scripts must support accessibility",
+      "required": false,
+      "validation": "Scripts should use techniques that support accessibility"
+    },
+    {
+      "id": "P22",
+      "name": "Testing",
+      "description": "Scripts must include tests",
+      "required": true,
+      "validation": "Scripts must have corresponding test files"
+    },
+    {
+      "id": "P23",
+      "name": "CI/CD Integration",
+      "description": "Scripts must be integrated with CI/CD pipelines",
+      "required": true,
+      "validation": "Scripts must be included in CI/CD workflow files"
+    },
+    {
+      "id": "P24",
+      "name": "Code Style",
+      "description": "Scripts must follow consistent code style",
+      "required": true,
+      "validation": "Scripts must pass linting with flake8 and formatting with black"
+    },
+    {
+      "id": "P25",
+      "name": "Documentation Generation",
+      "description": "Scripts must support documentation generation",
+      "required": true,
+      "validation": "Scripts must include docstrings that can be processed by documentation generators"
+    },
+    {
+      "id": "P26",
+      "name": "Logging Levels",
+      "description": "Scripts must use appropriate logging levels",
+      "required": true,
+      "validation": "Scripts must use different logging levels (info, warning, error) appropriately"
+    },
+    {
+      "id": "P27",
+      "name": "Configuration Validation",
+      "description": "Scripts must validate configuration",
+      "required": true,
+      "validation": "Scripts must check if configuration is valid before using it"
+    },
+    {
+      "id": "P28",
+      "name": "PRF Directive",
+      "description": "Scripts must include PRF directive in header",
+      "required": true,
+      "validation": "Scripts must include PRF directive in header comments"
+    }
+  ],
+  "components": [
+    {
+      "name": "rEFInd Boot Manager Configuration",
+      "files": [
+        "prf_refind_gui_auto_create.py",
+        "prf_refind_desktop_sync.py",
+        "refind_theme_generator.py"
+      ],
+      "rules": ["P01", "P02", "P03", "P04", "P05", "P06", "P07", "P08", "P09", "P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19", "P22", "P23", "P24", "P25", "P26", "P27", "P28"]
+    },
+    {
+      "name": "Gaze Tracking System",
+      "files": [
+        "gaze_ws_server.py",
+        "overlay_gaze_logger.py",
+        "gaze_mouse_control.py"
+      ],
+      "rules": ["P01", "P02", "P03", "P04", "P05", "P07", "P08", "P09", "P10", "P11", "P14", "P15", "P16", "P17", "P18", "P19", "P22", "P23", "P24", "P25", "P26", "P27", "P28"]
+    },
+    {
+      "name": "Testing Framework",
+      "files": [
+        "test_refind_config_simple.py",
+        "test_gaze_tracking.py",
+        "test_edge_cases.py",
+        "test_performance.py",
+        "run_tests.sh"
+      ],
+      "rules": ["P01", "P02", "P03", "P07", "P08", "P09", "P11", "P14", "P15", "P16", "P17", "P18", "P22", "P23", "P24", "P25", "P26", "P28"]
+    },
+    {
+      "name": "Documentation",
+      "files": [
+        "docs/index.md",
+        "docs/refind_config.md",
+        "docs/gaze_tracking.md",
+        "docs/testing.md",
+        "mkdocs.yml"
+      ],
+      "rules": ["P08", "P09", "P15", "P20", "P21", "P25"]
+    }
+  ]
+}

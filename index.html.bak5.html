@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Script Runner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Run Scripts</h1>
+    <button onclick="runScript('script1.sh')">Run Script 1</button>
+    <button onclick="runScript('script2.sh')">Run Script 2</button>
+    <button onclick="runScript('script3.sh', ['arg1', 'arg2'])">Run Script 3 with Args</button>
+    <button onclick="runScript('/absolute/path/to/script4.sh')">Run Script 4 (Absolute Path)</button>
+    <button onclick="uploadProjectViaGh()">Upload Project (gh)</button>
+
+    <h2>Output</h2>
+    <pre id="output"></pre>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

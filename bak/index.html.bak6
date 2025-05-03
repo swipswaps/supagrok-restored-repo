@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Supagrok Gaze UI</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: black;
+      overflow: hidden;
+      color: white;
+      font-family: sans-serif;
+      height: 100%;
+      width: 100%;
+    }
+    canvas#overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    #main {
+      display: none; /* Shown after calibration */
+      position: relative;
+      z-index: 10;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .calib-dot {
+      width: 20px;
+      height: 20px;
+      background: red;
+      border-radius: 50%;
+      position: absolute;
+      z-index: 10000;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="overlay"></canvas>
+  <div id="main">
+    <h1>Supagrok BootShield</h1>
+    <button onclick="fetch('/launchers/launch_nobara.sh')">Launch OS</button>
+  </div>
+
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+  <script>
+    const canvas = document.getElementById('overlay');
+    const ctx = canvas.getContext('2d');
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    const calibrationPoints = [
+      [0.1, 0.1], [0.5, 0.1], [0.9, 0.1],
+      [0.1, 0.5], [0.5, 0.5], [0.9, 0.5],
+      [0.1, 0.9], [0.5, 0.9], [0.9, 0.9]
+    ];
+    let currentDot = 0;
+
+    function placeCalibrationDot([xRatio, yRatio]) {
+      const dot = document.createElement('div');
+      dot.className = 'calib-dot';
+      dot.style.left = `${window.innerWidth * xRatio - 10}px`;
+      dot.style.top = `${window.innerHeight * yRatio - 10}px`;
+      dot.onclick = () => {
+        webgazer.recordScreenPosition(dot.offsetLeft + 10, dot.offsetTop + 10, 'click');
+        dot.remove();
+        currentDot++;
+        if (currentDot < calibrationPoints.length) {
+          placeCalibrationDot(calibrationPoints[currentDot]);
+        } else {
+          finishCalibration();
+        }
+      };
+      document.body.appendChild(dot);
+    }
+
+    function finishCalibration() {
+      console.log("✅ Calibration complete");
+      document.getElementById('main').style.display = 'block';
+    }
+
+    webgazer.setGazeListener((data) => {
+      if (data) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+        ctx.arc(data.x, data.y, 8, 0, 2 * Math.PI);
+        ctx.fillStyle = "rgba(0,255,0,0.7)";
+        ctx.fill();
+        ctx.strokeStyle = "#00ff00";
+        ctx.stroke();
+        ctx.fillStyle = "#fff";
+        ctx.fillText("👁", data.x + 10, data.y - 10);
+      }
+    }).begin()
+      .showPredictionPoints(true)
+      .showVideoPreview(true)
+      .showFaceOverlay(true);
+
+    window.onload = () => placeCalibrationDot(calibrationPoints[currentDot]);
+  </script>
+</body>
+</html>

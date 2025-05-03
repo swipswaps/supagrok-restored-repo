@@ -1,0 +1,1 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'><title>Supagrok Launcher</title><link rel='stylesheet' href='style.css'></head><body><h1>Supagrok BootShield</h1><button id='launch'>Launch OS</button><script src='script.js'></script></body></html>

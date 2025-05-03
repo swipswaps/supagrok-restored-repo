@@ -1,0 +1,98 @@
+<!-- PRF‑CALIB‑2025‑04‑30‑CALIBWINDOW‑FIXED -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Supagrok Gaze Overlay</title>
+  <style>
+    html, body { margin: 0; background: black; color: white; font-family: monospace; }
+    canvas#overlay { position: fixed; top: 0; left: 0; z-index: 1000; pointer-events: none; }
+    .statusLog { position: fixed; bottom: 0; width: 100%; background: black; color: lime; font-size: 12px; overflow-y: auto; max-height: 20vh; z-index: 9999; }
+    .calib-dot { width: 20px; height: 20px; background: red; border-radius: 50%; position: absolute; z-index: 2000; cursor: pointer; }
+    #calibBox {
+      position: fixed; top: 20%; left: 35%; padding: 20px; background: black; border: 4px solid lime;
+      display: flex; flex-direction: column; align-items: center; z-index: 99999;
+    }
+    .calibBtn {
+      background: #333; color: white; padding: 10px 20px; margin: 10px; border: 2px solid gray;
+      cursor: pointer; font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+<canvas id="overlay" width="640" height="480"></canvas>
+<div class="statusLog" id="statusLog"></div>
+
+<div id="calibBox">
+  <h1>Calibration Options</h1>
+  <button class="calibBtn" onclick="selectMode(1)">Mode 1 (Haar Eye)</button>
+  <button class="calibBtn" onclick="selectMode(2)">Mode 2 (DNN Face)</button>
+  <button class="calibBtn" onclick="selectMode(3)">Mode 3 (Facial Mesh)</button>
+  <button class="calibBtn" onclick="closeCalib()">Close</button>
+</div>
+
+<div id="webgazerGazeDot" style="display:none; position:fixed; z-index:99999; width:10px; height:10px;
+ background:red; border-radius:100%; opacity:0.7; left:-5px; top:-5px;"></div>
+
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script>
+let trail = [];
+let ws;
+let initialized = false;
+
+function logStatus(msg) {
+  const logEl = document.getElementById("statusLog");
+  const d = document.createElement("div");
+  d.textContent = msg;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function closeCalib() {
+  const box = document.getElementById("calibBox");
+  if (box) {
+    box.remove();
+    logStatus("✅ Calibration box closed.");
+  }
+}
+
+function selectMode(mode) {
+  closeCalib();
+  logStatus(`⚙️ Mode ${mode} selected.`);
+  // Stub logic, would trigger actual fallback
+}
+
+function drawTrail(ctx) {
+  const now = Date.now();
+  trail = trail.filter(p => now - p.t < 3000);
+  for (const p of trail) {
+    const alpha = 1 - (now - p.t) / 3000;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+    ctx.fillStyle = `rgba(0,255,0,${alpha})`;
+    ctx.fill();
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  logStatus("🟢 Initialized overlay environment...");
+  ws = new WebSocket("ws://localhost:8765");
+  ws.onopen = () => logStatus("✅ WebSocket connected.");
+  ws.onerror = () => logStatus("❌ WS error: undefined");
+
+  const canvas = document.getElementById("overlay");
+  const ctx = canvas.getContext("2d");
+  webgazer.setRegression('ridge');
+  webgazer.setGazeListener(data => {
+    if (!data) return;
+    const point = { x: data.x, y: data.y, t: Date.now() };
+    trail.push(point);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawTrail(ctx);
+  }).begin()
+    .then(() => logStatus("🧠 WebGazer loaded."))
+    .catch(e => logStatus("❌ WebGazer init failed: " + e));
+});
+</script>
+</body>
+</html>

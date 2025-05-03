@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Script Runner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Run Scripts</h1>
+    <!-- Updated to point to existing scripts based on ls output -->
+    <button onclick="window.electronAPI.runScript('run_tests.sh')">Run Tests</button>
+    <button onclick="window.electronAPI.runScript('launch_all.sh')">Launch All</button>
+    <button onclick="window.electronAPI.runScript('run_baseline_test.sh', ['arg1', 'arg2'])">Run Baseline Test with Args</button>
+    <button onclick="window.electronAPI.runScript('install_requirements.sh')">Install Requirements</button>
+    <!-- Keep the GitHub upload button -->
+    <button onclick="uploadProject()">Upload Project (gh)</button> <!-- Calls the function in renderer.js that includes the prompt -->
+
+    <h2>Output</h2>
+    <pre id="output"></pre>
+
+    <script src="renderer.js"></script> <!-- Make sure renderer.js defines uploadProject -->
+</body>
+</html>

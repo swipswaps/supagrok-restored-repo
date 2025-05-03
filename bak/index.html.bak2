@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Supagrok Launcher</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    #gazeDot {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background-color: red;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+    }
+  </style>
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+</head>
+<body>
+  <h1>Supagrok BootShield</h1>
+  <button id="launch">Launch OS</button>
+  <div id="gazeDot"></div>
+  <script src="script.js"></script>
+  <script>
+    webgazer.setGazeListener(function(data, elapsedTime) {
+      if (data == null) return;
+      const dot = document.getElementById('gazeDot');
+      dot.style.left = data.x + 'px';
+      dot.style.top = data.y + 'px';
+    }).begin();
+
+    webgazer.showVideoPreview(false).showPredictionPoints(false);
+  </script>
+</body>
+</html>

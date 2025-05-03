@@ -1,0 +1,93 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Supagrok Gaze Overlay</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; background: black; color: white;
+      overflow: hidden; font-family: monospace; height: 100%; width: 100%;
+    }
+    canvas#overlay {
+      position: fixed; top: 0; left: 0; z-index: 9999; pointer-events: none;
+    }
+    .status {
+      position: fixed; bottom: 0; left: 0; background: black; color: lime;
+      padding: 10px; font-size: 16px; z-index: 10000;
+    }
+    #calibModal {
+      position: fixed; top: 10%; left: 10%; right: 10%; bottom: 10%;
+      background: rgba(0,0,0,0.95); border: 3px solid lime; z-index: 99998;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    #calibModal button {
+      font-size: 20px; margin: 10px; padding: 10px 20px;
+      background: #222; color: white; border: 2px solid white;
+    }
+    .calib-dot {
+      width: 20px; height: 20px; background: red; border-radius: 50%;
+      position: absolute; z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+<canvas id="overlay" width="640" height="480"></canvas>
+<div class="status" id="statusLog">🟢 Initialized overlay environment...</div>
+
+<div id="calibModal">
+  <h1>Calibration Options</h1>
+  <button onclick="setMode(1)">Mode 1 (Haar Eye)</button>
+  <button onclick="setMode(2)">Mode 2 (DNN Face)</button>
+  <button onclick="setMode(3)">Mode 3 (Facial Mesh)</button>
+  <button onclick="closeModal()">Close</button>
+</div>
+
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script>
+let trail = [];
+const log = msg => document.getElementById("statusLog").textContent = msg;
+
+document.addEventListener("DOMContentLoaded", () => {
+  const canvas = document.getElementById("overlay");
+  const ctx = canvas.getContext("2d");
+  const ws = new WebSocket("ws://localhost:8765");
+
+  ws.onerror = () => log("❌ WS error: undefined");
+
+  webgazer.setRegression("ridge");
+  webgazer.setGazeListener(data => {
+    if (!data) return;
+    trail.push({x: data.x, y: data.y, t: Date.now()});
+  }).begin()
+    .then(() => log("🧠 WebGazer loaded."))
+    .catch(() => log("❌ WebGazer init failed"));
+
+  function drawTrail() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const now = Date.now();
+    for (const p of trail.filter(p => now - p.t < 3000)) {
+      const a = 1 - (now - p.t) / 3000;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = `rgba(0,255,0,${a})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(drawTrail);
+  }
+
+  drawTrail();
+});
+
+function closeModal() {
+  document.getElementById("calibModal").style.display = "none";
+  log("✅ Calibration window closed.");
+}
+
+function setMode(mode) {
+  log("📍 Calibration mode set to " + mode);
+  closeModal();
+}
+</script>
+</body>
+</html>

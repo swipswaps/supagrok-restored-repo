@@ -1,0 +1,133 @@
+<!-- index.html — PRF‑CALIB‑DWELL‑BLINK‑2025‑05‑01 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Supagrok Gaze Activation</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%; width: 100%;
+      background: black; color: white; overflow: hidden;
+      font-family: monospace;
+    }
+    canvas#overlay {
+      position: fixed; top: 0; left: 0;
+      pointer-events: none; z-index: 10;
+    }
+    #statusLog {
+      position: fixed; bottom: 0; left: 0; width: 100%;
+      background: black; color: lime;
+      font: 12px monospace; max-height: 25vh;
+      overflow-y: auto; z-index: 1000; padding: 5px;
+      border-top: 1px solid lime;
+    }
+    .gaze-button {
+      position: absolute;
+      padding: 12px 24px;
+      background: #222; color: white;
+      border: 1px solid lime;
+      cursor: pointer;
+      z-index: 900;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="overlay" width="1280" height="720"></canvas>
+<div class="gaze-button" style="top:20%;left:10%;" onclick="log('✅ Option A activated')">Option A</div>
+<div class="gaze-button" style="top:20%;right:10%;" onclick="log('✅ Option B activated')">Option B</div>
+<div id="statusLog">[Booting...]</div>
+
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script>
+let canvas = document.getElementById("overlay");
+let ctx = canvas.getContext("2d");
+let trail = [];
+let lastBlink = 0, blinkCount = 0;
+let dwellStart = null, dwellTarget = null;
+let kalmanX = new Kalman(), kalmanY = new Kalman();
+
+function Kalman() {
+  let A=1, H=1, Q=0.01, R=1, P=1, x=0;
+  this.filter = function(z) {
+    x = A * x; P = A * P * A + Q;
+    let K = P * H / (H * P * H + R);
+    x += K * (z - H * x); P = (1 - K * H) * P;
+    return x;
+  };
+}
+
+function log(msg, type="log") {
+  const ts = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.textContent = `[${ts}] ${msg}`;
+  if (type === "error") div.style.color = "red";
+  if (type === "event") div.style.color = "cyan";
+  document.getElementById("statusLog").appendChild(div);
+  document.getElementById("statusLog").scrollTop = 99999;
+  console.log(msg);
+}
+
+function drawTrail() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const now = Date.now();
+  trail = trail.filter(p => now - p.t < 3000);
+  for (const p of trail) {
+    const alpha = 1 - (now - p.t) / 3000;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = `rgba(0,255,0,${alpha})`;
+    ctx.fill();
+  }
+}
+
+function checkDwell(x, y) {
+  const buttons = document.querySelectorAll(".gaze-button");
+  for (const btn of buttons) {
+    const rect = btn.getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+      if (dwellTarget !== btn) {
+        dwellTarget = btn;
+        dwellStart = Date.now();
+      } else {
+        const now = Date.now();
+        const elapsed = now - dwellStart;
+        if (elapsed > 1000 && blinkCount >= 2) {
+          btn.click();
+          blinkCount = 0;
+          dwellStart = null;
+          dwellTarget = null;
+        }
+      }
+      return;
+    }
+  }
+  dwellTarget = null;
+  dwellStart = null;
+}
+
+function detectBlink(gx, gy) {
+  if (gx < 0 || gy < 0) {
+    const now = Date.now();
+    if (now - lastBlink < 500) blinkCount++;
+    else blinkCount = 1;
+    lastBlink = now;
+  }
+}
+
+function onGaze(data) {
+  if (!data) return;
+  const x = kalmanX.filter(data.x);
+  const y = kalmanY.filter(data.y);
+  trail.push({x, y, t: Date.now()});
+  drawTrail();
+  checkDwell(x, y);
+  detectBlink(data.x, data.y);
+}
+
+webgazer.setRegression("ridge");
+webgazer.setGazeListener(onGaze);
+webgazer.begin().then(() => log("🧠 WebGazer Ready", "event"));
+</script>
+</body>
+</html>
