@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# PRF-SUPAGROK-GITHUB-SYNC-2025-05-03-I — Replace Sync with Push for Updates
-# Directive: PRF-MODIFY-SCRIPT-2025-05-03-I
-# UUID: 789abcde-f012-3456-789a-bcdef0123456 # Example UUID, replace if needed
-# Timestamp: 2025-05-03T11:00:00Z # Example timestamp
+# PRF-SUPAGROK-GITHUB-SYNC-2025-05-03-H — Separate Create/Push, Harden Sync Non-Interactive
+# Directive: PRF-MODIFY-SCRIPT-2025-05-03-H
+# UUID: 456789ab-cdef-0123-4567-89abcdef0123 # Example UUID, replace if needed
+# Timestamp: 2025-05-03T08:00:00Z # Example timestamp
 
 # --- Argument Validation ---
 # Ensure the target repository argument is provided
@@ -37,7 +37,7 @@ echo "✅ Required tools found."
 
 # --- Authentication Check ---
 echo "ℹ️ Checking GitHub authentication..."
-if ! gh auth status &> /dev/null; then
+if ! gh auth status > /dev/null; then
     echo "❌ GitHub authentication failed. Please run 'gh auth login'." >&2
     gh auth status >&2
     exit 1
@@ -96,16 +96,16 @@ echo "✅ Current branch is '${CURRENT_BRANCH}'."
 # --- Conditional GitHub Create/Push or Sync ---
 echo "ℹ️ Checking if remote repository '${TARGET_REPO}' exists..."
 if gh repo view "${TARGET_REPO}" &> /dev/null; then
-    # --- Repository Exists - Perform Push ---
-    echo "✅ Remote repository found. Attempting to push..."
-    # Ensure origin URL is correct before pushing, in case it was changed manually
+    # --- Repository Exists - Perform Sync ---
+    echo "✅ Remote repository found. Attempting to sync..."
+    # Ensure origin URL is correct before syncing, in case it was changed manually
     echo "ℹ️ Verifying 'origin' remote URL points to ${REPO_URL}..."
     if git remote | grep -q '^origin$'; then
         CURRENT_ORIGIN_URL=$(git remote get-url origin)
         if [[ "${CURRENT_ORIGIN_URL}" != "${REPO_URL}" ]]; then
             echo "⚠️ 'origin' remote URL is incorrect (${CURRENT_ORIGIN_URL}). Updating to ${REPO_URL}..."
             if ! git remote set-url origin "${REPO_URL}"; then
-                 echo "❌ Failed to update 'origin' remote URL before push." >&2
+                 echo "❌ Failed to update 'origin' remote URL before sync." >&2
                  exit 1
             fi
             echo "✅ Updated 'origin' remote URL."
@@ -113,26 +113,30 @@ if gh repo view "${TARGET_REPO}" &> /dev/null; then
             echo "✅ 'origin' remote URL is correct."
         fi
     else
-        echo "⚠️ 'origin' remote not found. Adding it before push..."
+        echo "⚠️ 'origin' remote not found. Adding it before sync..."
          if ! git remote add origin "${REPO_URL}"; then
-            echo "❌ Failed to add 'origin' remote before push." >&2
+            echo "❌ Failed to add 'origin' remote before sync." >&2
             exit 1
         fi
         echo "✅ Added 'origin' remote."
     fi
 
-    # Now perform a standard git push instead of gh repo sync
-    echo "ℹ️ Pushing branch '${CURRENT_BRANCH}' to existing repository 'origin' with progress..."
-    if git push --verbose --progress origin "${CURRENT_BRANCH}"; then
-        echo "✅ Branch '${CURRENT_BRANCH}' pushed successfully to existing repository."
+    # Now perform the sync, forcing non-interactive
+    echo "ℹ️ Syncing branch '${CURRENT_BRANCH}' with remote '${TARGET_REPO}' non-interactively..."
+    if gh repo sync "${TARGET_REPO}" --source "${CURRENT_BRANCH}" --branch "${CURRENT_BRANCH}" < /dev/null; then
+        echo "✅ Repository synced successfully to branch '${CURRENT_BRANCH}' on remote '${TARGET_REPO}'."
     else
-        GIT_EXIT_CODE=$?
-        echo "❌ Failed to push branch '${CURRENT_BRANCH}' to existing 'origin'. Exit code: ${GIT_EXIT_CODE}" >&2
-        echo "ℹ️ Common causes for push failure include:" >&2
-        echo "   - Authentication issues (check credential helper or SSH keys)." >&2
-        echo "   - Network connectivity problems." >&2
-        echo "   - Remote has changes not present locally (consider 'git pull' first)." >&2
-        exit ${GIT_EXIT_CODE}
+        GH_EXIT_CODE=$?
+        echo "❌ Failed to sync existing repository '${TARGET_REPO}' with GitHub using 'gh repo sync'. Exit code: ${GH_EXIT_CODE}" >&2
+        # Check if the error message still matches the weird format error
+        if [[ $GH_EXIT_CODE -eq 1 ]] && grep -q 'expected the "\[HOST/\]OWNER/REPO" format, got "'"${CURRENT_BRANCH}"'"' <<< "$(gh repo sync "${TARGET_REPO}" --source "${CURRENT_BRANCH}" --branch "${CURRENT_BRANCH}" < /dev/null 2>&1)"; then
+             echo "‼️ Persistent Error: 'gh repo sync' failed with format error despite correct arguments and non-interactive mode. Check gh version or environment." >&2
+        elif [[ ${GH_EXIT_CODE} -eq 1 ]]; then
+            echo "ℹ️ Common causes for sync failure include:" >&2
+            echo "   - Local branch '${CURRENT_BRANCH}' has diverged significantly from the remote (fetch/merge needed?)." >&2
+            echo "   - Network issues connecting to GitHub." >&2
+        fi
+        exit ${GH_EXIT_CODE}
     fi
 else
     # --- Repository Does Not Exist - Create, Set Remote, Push Verbose ---
