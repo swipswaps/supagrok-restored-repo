@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# PRF-SUPAGROK-GITHUB-SYNC-2025-05-03-G — Separate Create and Verbose Push for GitHub Repo
-# Directive: PRF-MODIFY-SCRIPT-2025-05-03-G
-# UUID: 23456789-abcd-ef01-2345-6789abcdef01 # Example UUID, replace if needed
-# Timestamp: 2025-05-03T06:00:00Z # Example timestamp
+# PRF-SUPAGROK-GITHUB-SYNC-2025-05-03-H — Separate Create/Push, Harden Sync Non-Interactive
+# Directive: PRF-MODIFY-SCRIPT-2025-05-03-H
+# UUID: 456789ab-cdef-0123-4567-89abcdef0123 # Example UUID, replace if needed
+# Timestamp: 2025-05-03T08:00:00Z # Example timestamp
 
 # --- Argument Validation ---
 # Ensure the target repository argument is provided
@@ -78,7 +78,6 @@ if ! git diff --staged --quiet; then
         echo "✅ Changes committed."
     else
         echo "⚠️ git commit command failed unexpectedly." >&2
-        # Optionally exit here depending on desired strictness
         exit 1 # Exit if commit fails for safety
     fi
 else
@@ -122,13 +121,17 @@ if gh repo view "${TARGET_REPO}" &> /dev/null; then
         echo "✅ Added 'origin' remote."
     fi
 
-    # Now perform the sync
-    if gh repo sync "${TARGET_REPO}" --source "${CURRENT_BRANCH}" --branch "${CURRENT_BRANCH}"; then
+    # Now perform the sync, forcing non-interactive
+    echo "ℹ️ Syncing branch '${CURRENT_BRANCH}' with remote '${TARGET_REPO}' non-interactively..."
+    if gh repo sync "${TARGET_REPO}" --source "${CURRENT_BRANCH}" --branch "${CURRENT_BRANCH}" < /dev/null; then
         echo "✅ Repository synced successfully to branch '${CURRENT_BRANCH}' on remote '${TARGET_REPO}'."
     else
         GH_EXIT_CODE=$?
         echo "❌ Failed to sync existing repository '${TARGET_REPO}' with GitHub using 'gh repo sync'. Exit code: ${GH_EXIT_CODE}" >&2
-        if [[ ${GH_EXIT_CODE} -eq 1 ]]; then
+        # Check if the error message still matches the weird format error
+        if [[ $GH_EXIT_CODE -eq 1 ]] && grep -q 'expected the "\[HOST/\]OWNER/REPO" format, got "'"${CURRENT_BRANCH}"'"' <<< "$(gh repo sync "${TARGET_REPO}" --source "${CURRENT_BRANCH}" --branch "${CURRENT_BRANCH}" < /dev/null 2>&1)"; then
+             echo "‼️ Persistent Error: 'gh repo sync' failed with format error despite correct arguments and non-interactive mode. Check gh version or environment." >&2
+        elif [[ ${GH_EXIT_CODE} -eq 1 ]]; then
             echo "ℹ️ Common causes for sync failure include:" >&2
             echo "   - Local branch '${CURRENT_BRANCH}' has diverged significantly from the remote (fetch/merge needed?)." >&2
             echo "   - Network issues connecting to GitHub." >&2
@@ -140,7 +143,6 @@ else
     echo "ℹ️ Remote repository '${TARGET_REPO}' not found or inaccessible. Attempting to create..."
 
     # 1. Create the repository structure on GitHub (non-interactively, no push yet)
-    # Use --source . to include local files in the creation context, even though push is separate
     if gh repo create "${TARGET_REPO}" --source . "--${NEW_REPO_VISIBILITY}" < /dev/null; then
         echo "✅ Repository structure '${TARGET_REPO}' created successfully on GitHub."
     else
@@ -177,7 +179,6 @@ else
 
     # 3. Push the current branch with progress and verbosity
     echo "ℹ️ Pushing branch '${CURRENT_BRANCH}' to new repository 'origin' with progress..."
-    # Use -u to set upstream for the current branch
     if git push --verbose --progress -u origin "${CURRENT_BRANCH}"; then
         echo "✅ Branch '${CURRENT_BRANCH}' pushed successfully to new repository."
     else

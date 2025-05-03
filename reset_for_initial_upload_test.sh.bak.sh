@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# PRF-SUPAGROK-TEST-RESET-2025-05-03-C — Handle Missing Scope Error
-# Directive: PRF-MODIFY-SCRIPT-2025-05-03-C
-# UUID: 6789abcd-ef01-2345-6789-abcdef012345 # Example UUID, replace if needed
-# Timestamp: 2025-05-03T10:00:00Z # Example timestamp
+# PRF-SUPAGROK-TEST-RESET-2025-05-03-A — Automates setup for initial GitHub upload test
+# Directive: PRF-CREATE-SCRIPT-2025-05-03-A
+# UUID: 3456789a-bcde-f012-3456-789abcdef012 # Example UUID, replace if needed
+# Timestamp: 2025-05-03T07:00:00Z # Example timestamp
 
 # --- Argument Validation ---
 : ${1?"Usage: $0 <owner/repo>"}
@@ -39,28 +39,20 @@ echo "✅ GitHub authentication successful."
 
 # --- Delete Remote Repository (Non-Interactive) ---
 echo "ℹ️ Attempting to delete remote repository '${TARGET_REPO}' (if it exists)..."
-DELETE_STDERR=$(gh repo delete "${TARGET_REPO}" --yes 2>&1)
+gh repo delete "${TARGET_REPO}" --yes
 DELETE_EXIT_CODE=$?
 # Re-enable exit on error
 set -e
-
-# Check exit code and stderr content
+# Check exit code specifically for "not found" vs other errors
 if [[ ${DELETE_EXIT_CODE} -eq 0 ]]; then
     echo "✅ Remote repository '${TARGET_REPO}' deleted successfully."
-elif echo "$DELETE_STDERR" | grep -q -e "delete_repo scope" -e "HTTP 403"; then
-    # Specific error for missing scope
-    echo "❌ Failed to delete remote repository '${TARGET_REPO}'. Exit code: ${DELETE_EXIT_CODE}." >&2
-    echo "   Reason: The currently authenticated 'gh' token lacks the required 'delete_repo' scope." >&2
-    echo "   Stderr: $DELETE_STDERR" >&2
-    exit 1 # Use a consistent exit code for this failure
-elif ! gh repo view "${TARGET_REPO}" &> /dev/null; then
-    # If delete failed but repo doesn't exist anyway, consider it a success for reset purposes
-    echo "ℹ️ Remote repository '${TARGET_REPO}' not found or delete completed despite non-zero exit (${DELETE_EXIT_CODE}). Proceeding..."
-else
-    # If delete failed for some other reason and the repo still exists
-    echo "❌ Failed to delete remote repository '${TARGET_REPO}' for an unknown reason. Exit code: ${DELETE_EXIT_CODE}." >&2
-    echo "   Stderr: $DELETE_STDERR" >&2
+elif gh repo view "${TARGET_REPO}" &> /dev/null; then
+    # If delete failed but view succeeds, it was likely a permissions issue or other error
+    echo "❌ Failed to delete remote repository '${TARGET_REPO}'. Exit code: ${DELETE_EXIT_CODE}. Please check permissions or delete manually." >&2
     exit ${DELETE_EXIT_CODE}
+else
+    # If delete failed and view fails, the repo likely didn't exist, which is fine.
+    echo "ℹ️ Remote repository '${TARGET_REPO}' not found or already deleted. Proceeding..."
 fi
 
 
