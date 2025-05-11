@@ -31,4 +31,5 @@ __pycache__/
 
 # Ignore data and test data folders
 data/
-test_data/
+test_data/.git_bak/
+node_modules/
