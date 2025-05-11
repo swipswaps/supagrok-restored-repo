@@ -1,0 +1,5 @@
+*.log
+68*.txt
+chat_logs_*.txt
+augment_*.txt
+gemini_interactions_grep_results_*.txt
