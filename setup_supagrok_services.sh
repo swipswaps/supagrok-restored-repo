@@ -15,7 +15,7 @@ docker run -d --name n8n -p 5678:5678 -v ~/n8n_data:/home/node/.n8n n8nio/n8n
 
 # 3. Start Supabase (example, adjust as needed)
 if [ ! -f docker-compose.yml ]; then
-  curl -o docker-compose.yml https://raw.githubusercontent.com/supabase/supabase/develop/docker/docker-compose.yml
+  curl -o docker-compose.yml https://raw.githubusercontent.com/supabase/supabase/master/docker/docker-compose.yml
 fi
 docker compose up -d
 
