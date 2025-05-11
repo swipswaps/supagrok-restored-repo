@@ -24,6 +24,7 @@ __pycache__/
 # Ignore backup and shell script files
 *.bak
 *.bak.*
+!setup_supagrok_services.sh
 *.sh
 
 # Ignore JSON data files
