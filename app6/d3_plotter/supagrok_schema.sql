@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS logs (id SERIAL, timestamp TIMESTAMPTZ, data JSONB);

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# PRF‑COPYQ‑LIST‑INSTALLER‑2025‑05‑08‑FINAL
+# UUID: a588ac0c-c60c-4096-82b6-59b15c2dc511
+# Timestamp: 2025-05-08T15:38:00Z
+# Description: Installs and verifies /usr/local/bin/copyq-list with environment hardening
+
+set -euo pipefail
+
+TARGET="/usr/local/bin/copyq-list"
+
+echo "📦 Installing PRF wrapper: $TARGET"
+
+sudo bash -c "cat > '$TARGET'" <<'EOF'
+#!/usr/bin/env bash
+# PRF-COPYQ-LIST-WRAPPER-2025-05-08-FINAL
+# UUID: 88d49fe3-8d82-4ed1-9c6a-b272aefb05d4
+# Timestamp: 2025-05-08T15:17:00Z
+# Description: Reliable, DBus-safe Flatpak CopyQ wrapper to list clipboard entries with readable formatting.
+
+set -euo pipefail
+
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/$(id -u)/bus}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+if ! flatpak ps | grep -q com.github.hluk.copyq; then
+  echo "🚀 Starting CopyQ Flatpak server..."
+  flatpak run com.github.hluk.copyq --start-server >/dev/null 2>&1 &
+  sleep 1
+fi
+
+flatpak run com.github.hluk.copyq eval -- "
+var out = '';
+for (var i = 0; i < size(); ++i) {
+  var content = str(read(i)).replace(/\n/g, '⏎');
+  out += i + ': ' + content + '\n';
+}
+print(out);"
+EOF
+
+sudo chmod +x "$TARGET"
+echo "✅ Installed and permissioned: $TARGET"
+
+# 🔍 Test run
+echo "🧪 Verifying output:"
+"$TARGET" | head -n 10

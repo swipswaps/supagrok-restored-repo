@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# PRF‑COPYQ‑KLIPPER‑DBUS‑MIGRATOR‑2025‑05‑08‑FINAL
+# UUID: affbfb1a-b713-57af-b7a0-edd00aa3375e
+# Timestamp: 2025-05-08T13:50:53Z
+# Description: Migrate all KDE clipboard contents from both DBus and klipper history to CopyQ Flatpak
+
+set -euo pipefail
+
+MIGRATION_LOG=~/.cache/copyq_migration_dbustray.log
+HIST_FILE=$(find ~/.local/share/klipper -iname 'history*.lst' | head -n 1 || true)
+TEMP_FILE="/tmp/clipboard_total.$UID.txt"
+DBUS_RAW="/tmp/dbus_clip_dump.$UID.txt"
+COPYQ_CMD="flatpak run com.github.hluk.copyq"
+LINES_IMPORTED=0
+
+echo "📋 Starting KDE+DBus+CopyQ sync @ $(date)" | tee "$MIGRATION_LOG"
+
+# STEP 1: Extract DBus system clipboard (if running)
+echo "🔍 Attempting DBus clipboard extraction..."
+
+qdbus org.kde.klipper /klipper org.kde.klipper.getClipboardHistory 2>/dev/null \
+  | grep -v '^[[:space:]]*$' \
+  | sed 's/^[0-9]*: //' | sort | uniq > "$DBUS_RAW" || echo "⚠️ DBus tray not available"
+
+# STEP 2: Extract Klipper history file (if exists)
+if [[ -f "$HIST_FILE" ]]; then
+  strings "$HIST_FILE" | grep -v '^[[:space:]]*$' | sort | uniq >> "$TEMP_FILE"
+fi
+
+# Combine and deduplicate
+cat "$DBUS_RAW" "$TEMP_FILE" 2>/dev/null | sort | uniq > "$TEMP_FILE.final"
+TOTAL=$(wc -l < "$TEMP_FILE.final")
+
+echo "📦 Prepared $TOTAL clipboard entries for CopyQ"
+
+# STEP 3: Start CopyQ server
+if ! pgrep -fa "com.github.hluk.copyq.*--start-server" >/dev/null; then
+  echo "🚀 Starting CopyQ..."
+  $COPYQ_CMD --start-server >/dev/null 2>&1 &
+  sleep 0.75
+fi
+
+# STEP 4: Import into CopyQ
+while IFS= read -r entry; do
+  if [[ -n "$entry" ]]; then
+    $COPYQ_CMD add "$entry" >/dev/null 2>&1 && ((LINES_IMPORTED++))
+  fi
+done < "$TEMP_FILE.final"
+
+echo "✅ Imported $LINES_IMPORTED entries to CopyQ"
+echo "🔐 Log: $MIGRATION_LOG"
+echo "📎 Hash: $(sha256sum "$MIGRATION_LOG" | cut -d' ' -f1)"

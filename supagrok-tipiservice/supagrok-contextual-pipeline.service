@@ -1,0 +1,48 @@
+# /etc/systemd/system/supagrok-contextual-pipeline.service
+# Systemd unit file for running the Supagrok Contextual RAG Pipeline as a service.
+# PRF-DIRECTIVE: PRF-CONTEXTUAL-RAG-SUPPORT-ARTIFACTS-2025-05-08-A
+
+[Unit]
+Description=Supagrok Contextual RAG Document Ingestion Pipeline
+Documentation=file:///home/owner/Documents/scripts/AICode/680fddc4-f7f8-8008-a24f-ccde790499ca/app/supagrok_restored_repo/README.md
+After=network.target postgresql.service
+# If your PostgreSQL service has a different name, adjust accordingly (e.g., postgresql@14-main.service, pgvector.service)
+
+[Service]
+# User and Group to run the service as.
+# Create a dedicated user for this service for better security.
+# Example: User=supagrok_pipeline_user Group=supagrok_pipeline_group
+User=owner
+Group=owner
+
+# Working directory where contextual_pipeline.py and the 'documents' subdirectory are located.
+# Replace with the actual absolute path to your project directory.
+WorkingDirectory=/home/owner/Documents/scripts/AICode/680fddc4-f7f8-8008-a24f-ccde790499ca/app/supagrok_restored_repo/supagrok-tipiservice/
+
+# Path to the .env file containing environment variables.
+# Replace with the actual absolute path to your .env file.
+EnvironmentFile=/home/owner/Documents/scripts/AICode/680fddc4-f7f8-8008-a24f-ccde790499ca/app/supagrok_restored_repo/supagrok-tipiservice/.env
+
+# Command to start the service.
+# Ensure python3 is in the system's PATH or provide the full path to the python3 executable.
+# Replace paths with actual absolute paths.
+ExecStart=/usr/bin/python3 /home/owner/Documents/scripts/AICode/680fddc4-f7f8-8008-a24f-ccde790499ca/app/supagrok_restored_repo/supagrok-tipiservice/contextual_pipeline.py
+
+# Restart policy.
+Restart=always
+RestartSec=10
+
+# Standard output and error logging.
+# Consider redirecting to a dedicated log file for easier debugging.
+# Example:
+# StandardOutput=append:/var/log/supagrok/contextual_pipeline.log
+# StandardError=append:/var/log/supagrok/contextual_pipeline_error.log
+StandardOutput=journal
+StandardError=journal
+
+# Optional: Set resource limits
+# LimitNOFILE=65536
+# LimitNPROC=1024
+
+[Install]
+WantedBy=multi-user.target

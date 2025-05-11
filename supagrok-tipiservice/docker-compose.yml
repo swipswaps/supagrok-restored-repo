@@ -1,0 +1,23 @@
+version: '3.9'
+services:
+  supagrok-snapshot-service:
+    image: supagrok/snapshot-tipiservice:local
+    container_name: supagrok_snapshot_service_container
+    ports:
+      - "8080:8000"  # Map container port 8000 to host port 8080
+    volumes:
+    - ./data:/data
+    environment:
+      GPG_KEY_ID: tipi-backup@supagrok.io
+      GPG_PASSPHRASE: secureTipiSnapshotPass123
+      PYTHONUNBUFFERED: '1'
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://localhost:8000/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    build: .
