@@ -24,6 +24,9 @@ echo "🔐 [SUPAGROK] Connecting to IONOS and deploying..."
 ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "${IONOS_USER}@${IONOS_HOST}" bash <<EOF
   set -euo pipefail
   cd ${IONOS_REMOTE_DIR}
+  echo "⚠️  Forcing discard of all local changes to match GitHub (PRF best practice)..."
+  git reset --hard origin/${GIT_BRANCH} || git reset --hard HEAD
+  git clean -fd
   echo "🔄 [IONOS] Pulling latest code from GitHub..."
   git pull origin ${GIT_BRANCH}
   echo "🚀 [IONOS] Running service setup..."
