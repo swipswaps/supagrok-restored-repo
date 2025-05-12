@@ -26,7 +26,8 @@ __pycache__/
 *.bak.*
 !setup_supagrok_services.sh
 !supagrok_deploy.sh
-*.sh
+!setup_supagrok_services.sh
+!supagrok_deploy.sh
 
 # Ignore JSON data files
 *.json
