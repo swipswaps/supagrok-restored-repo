@@ -1,0 +1,16 @@
+api:
+  enabled: true
+  address: 0.0.0.0:9001
+
+sources:
+  docker_logs:
+    type: docker_logs
+
+sinks:
+  file_sink:
+    type: file
+    inputs:
+      - docker_logs
+    path: /log/vector/collected.log
+    encoding:
+      codec: json

@@ -1,0 +1,33 @@
+sources:
+  docker_logs:
+    type: docker_logs
+    docker_host: unix:///var/run/docker.sock
+
+transforms:
+  add_metadata:
+    type: remap
+    inputs:
+      - docker_logs
+    source: |
+      .service = .container_name
+      .project_id = "default"
+
+sinks:
+  console:
+    type: console
+    inputs:
+      - add_metadata
+    encoding:
+      codec: json
+  
+  http:
+    type: http
+    inputs:
+      - add_metadata
+    encoding:
+      codec: json
+    uri: http://analytics:4000/api/logs
+    method: post
+    headers:
+      Content-Type: application/json
+      x-api-key: "${LOGFLARE_API_KEY}"
