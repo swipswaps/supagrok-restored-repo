@@ -40,25 +40,25 @@ services:
       timeout: 5s
       retries: 5
 
-  analytics:
-    container_name: supabase-analytics
-    image: supabase/analytics:latest # Corrected image
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: postgres
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-    ports:
-      - 3001:3000 # Using a different port
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+  # analytics: # Commented out due to image pull issues
+  #   container_name: supabase-analytics
+  #   image: supabase/analytics:latest # Corrected image
+  #   restart: unless-stopped
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   environment:
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: postgres
+  #     POSTGRES_HOST: db
+  #     POSTGRES_PORT: 5432
+  #   ports:
+  #     - 3001:3000 # Using a different port
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
 
   storage:
     container_name: supabase-storage
