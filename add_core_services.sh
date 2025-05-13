@@ -7,15 +7,15 @@ echo "🔧 Adding remaining core Supabase services incrementally..."
 
 # Check if db and analytics are running
 db_running=$(docker-compose ps db | grep "Up" || echo "")
-analytics_running=$(docker-compose ps analytics | grep "Up" || echo "")
+# analytics_running=$(docker-compose ps analytics | grep "Up" || echo "") # Analytics is commented out in docker-compose.yml
 
-if [ -z "$db_running" ] || [ -z "$analytics_running" ]; then
-  echo "❌ Error: Database and analytics must be running first."
-  echo "Please run these commands first:"
+if [ -z "$db_running" ]; then # Only check if db is running
+  echo "❌ Error: Database must be running first."
+  echo "Please run this command first:"
   echo "  docker-compose up -d db"
-  echo "  docker-compose up -d analytics"
   exit 1
 fi
+# Check for analytics is removed as it's commented out in docker-compose.yml
 
 # Make a backup of the current working docker-compose.yml
 cp docker-compose.yml docker-compose.yml.with_analytics
