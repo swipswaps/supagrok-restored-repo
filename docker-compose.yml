@@ -82,7 +82,7 @@ services:
       ENABLE_IMAGE_TRANSFORMATION: "true"
       IMGPROXY_URL: http://imgproxy:5001
     volumes:
-      - ./volumes/storage:/var/lib/storage
+      - supabase_storage_data:/var/lib/storage # Use named volume
     ports:
       - 5000:5000
     healthcheck:
@@ -302,7 +302,7 @@ services:
       IMGPROXY_USE_ETAG: "true"
       IMGPROXY_ENFORCE_SECURITY: "false" # Set to true in production and configure signature/salt
     volumes:
-      - ./volumes/storage:/var/lib/storage:ro
+      - supabase_storage_data:/var/lib/storage:ro # Use named volume
     ports:
       - 5001:5001
 
@@ -405,3 +405,5 @@ services:
 volumes:
   n8n-data:
     driver: local
+  supabase_storage_data: # Named volume for storage
+    driver: local # Assuming local driver, adjust if needed
