@@ -21,11 +21,11 @@ for script in add_core_services.sh add_gateway_services.sh add_ui_services.sh ad
 done
 
 echo "1️⃣ Starting initial core services (DB, Analytics)..."
-# Start db and analytics first, as required by add_core_services.sh
-docker-compose up -d db analytics
+# Start db first, as required by add_core_services.sh (analytics is commented out)
+docker-compose up -d db
 
-echo "Waiting for db and analytics to become healthy (30 seconds)..."
-sleep 30 # Give services time to start and become healthy
+echo "Waiting for db to become healthy (30 seconds)..."
+sleep 30 # Give service time to start and become healthy
 
 echo ""
 echo "🔧 Adding remaining core Supabase services (Vector, Storage, Auth, REST, Functions)..."
