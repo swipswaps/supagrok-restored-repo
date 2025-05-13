@@ -405,3 +405,5 @@ services:
 volumes:
   n8n-data:
     driver: local
+  storage: # Added based on validation error
+    driver: local # Assuming local driver, adjust if needed
